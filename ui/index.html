@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SEBAS - Cyber Butler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/ui/styles.css" />
+</head>
+<body>
+  <canvas id="bg"></canvas>
+  <div class="overlay-glass"></div>
+  <div class="container">
+    <header class="topbar">
+      <div class="brand">SEBAS</div>
+      <div class="status-group">
+        <div class="status-item" id="mic-status"><span class="dot"></span> Microphone</div>
+        <div class="status-item" id="proc-status"><span class="dot"></span> Processing</div>
+        <div class="status-item" id="sys-status"><span class="dot"></span> System</div>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="circle">
+        <canvas id="wave"></canvas>
+        <div class="holo">
+          <div class="rings"></div>
+          <div class="title">CYBER BUTLER</div>
+        </div>
+      </div>
+
+      <section class="panels">
+        <div class="panel">
+          <h3>Listening</h3>
+          <p id="mic-text">Idle</p>
+        </div>
+        <div class="panel">
+          <h3>Processing</h3>
+          <p id="proc-text">Standby</p>
+        </div>
+        <div class="panel">
+          <h3>System</h3>
+          <p id="sys-text">OK</p>
+        </div>
+      </section>
+
+      <section class="command-bar">
+        <form id="cmd-form">
+          <input id="cmd-input" type="text" placeholder="Type a command (e.g., open notepad, shutdown, volume 50)" autocomplete="off"/>
+          <button type="submit">Run</button>
+        </form>
+        <div id="cmd-result" class="cmd-result" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <footer class="footer">© SEBAS — Personal AI Assistant</footer>
+  </div>
+
+  <script src="/ui/script.js"></script>
+</body>
+</html>
