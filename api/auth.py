@@ -5,8 +5,6 @@ Authentication and Authorization Framework
 
 import os
 import secrets
-import hashlib
-import hmac
 import time
 import logging
 from typing import Optional, Dict, Callable
@@ -143,7 +141,7 @@ class AuthManager:
             'exp': exp,
             'iat': int(time.time())
         }
-        return jwt.encode(payload, self.secret_key, algorithm=self.jwt_algorithm)
+        return jwt. encode(payload, self.secret_key, algorithm=self.jwt_algorithm)
     
     def validate_jwt(self, token: str) -> Optional[Dict]:
         """

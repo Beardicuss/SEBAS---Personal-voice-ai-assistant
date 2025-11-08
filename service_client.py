@@ -3,8 +3,8 @@ import json
 import logging
 from typing import Any, Dict
 
-from preferences import PreferenceStore
-from permissions import Role
+from .constants.preferences import PreferenceStore
+from .constants.permissions import Role
 
 # Define required roles for commands
 # This could be expanded to be more granular

@@ -7,9 +7,9 @@ import json
 import logging
 import threading
 import time
-from typing import Dict, List, Callable, Optional, Any
+from typing import Dict, List, Optional, Any
 from datetime import datetime
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from enum import Enum
 
 # Optional requests library

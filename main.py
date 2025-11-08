@@ -27,6 +27,14 @@ from services.voice_engine import VoiceEngineManager
 from services.language_manager import LanguageManager
 from constants.permissions import Role, get_permission_for_intent
 import pyaudio
+import json
+from comtypes import POINTER, cast
+from comtypes.client import GetModule
+from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+from ctypes import POINTER as C_PTR
+from comtypes import CLSCTX_ALL
+from typing import Any
+from comtypes.client import GetBestInterface
 
 # ----------------------- Profiles & Logging -----------------------
 # Profile-aware base directory for logs and preferences
@@ -39,7 +47,7 @@ except Exception:
 
 # Try to use structured logging if available (Phase 1.5)
 try:
-    from logging_config import setup_structured_logging, get_audit_logger, LogContext
+    from logging_conf.logging_config import setup_structured_logging, get_audit_logger, LogContext
     LOG_PATH = os.path.join(PROFILE_DIR, "sebas.log")
     setup_structured_logging(
         log_file=LOG_PATH,
@@ -68,7 +76,7 @@ except ImportError:
 # ----------------------- Logging Dashboard (Flask) -----------------------
 try:
 	if str(os.environ.get('SEBAS_LOG_DASHBOARD', '0')).lower() in ('1', 'true', 'yes'):
-		from logging_dashboard import start_logging_dashboard
+		from logging_conf.logging_dashboard import start_logging_dashboard
 		host = os.environ.get('SEBAS_LOG_DASHBOARD_HOST', '127.0.0.1')
 		port = int(os.environ.get('SEBAS_LOG_DASHBOARD_PORT', '5600'))
 		audit_path = os.path.join(os.path.dirname(LOG_PATH), 'sebas_audit.log')
@@ -278,7 +286,7 @@ class Sebas:
             from services.voice_manager import VoiceManager
             from services.nlu import SimpleNLU, ContextManager
             from services.task_manager import TaskManager
-            from integrations.smart_home import HomeAssistantClient
+            # from integrations.smart_home import HomeAssistantClient
             from integrations.calendar_client import CalendarClient
             from integrations.email_client import EmailClient
             from integrations.ad_client import ADClient
@@ -290,7 +298,7 @@ class Sebas:
             self.nlu = SimpleNLU()
             self.context = ContextManager()
             self.tasks = TaskManager()
-            self.smarthome = HomeAssistantClient()
+            #self.smarthome = HomeAssistantClient()
             self.calendar = CalendarClient()
             self.email = EmailClient()
             try:
@@ -332,7 +340,7 @@ class Sebas:
                 from integrations.network_manager import NetworkManager
                 from integrations.firewall_manager import FirewallManager
                 from integrations.port_monitor import PortMonitor
-                from integrations.vpn_manager import VPNManager
+                #from integrations.vpn_manager import VPNManager
                 
                 if platform.system() == 'Windows':
                     self.service_manager = WindowsServiceManager()
@@ -340,14 +348,14 @@ class Sebas:
                     self.network_manager = NetworkManager()
                     self.firewall_manager = FirewallManager()
                     self.port_monitor = PortMonitor()
-                    self.vpn_manager = VPNManager()
+                    #self.vpn_manager = VPNManager()
                 else:
                     self.service_manager = None
                     self.process_manager = None
                     self.network_manager = None
                     self.firewall_manager = None
                     self.port_monitor = None
-                    self.vpn_manager = None
+                    #self.vpn_manager = None
                     
                 # Phase 3: Initialize file operations and storage managers
                 if platform.system() == 'Windows':
@@ -518,14 +526,18 @@ class Sebas:
                 # Prefer ElevenLabs engine if configured, with fallback
                 lang = 'en'
                 try:
-                    if getattr(self, 'language_manager', None):
-                        lang = self.language_manager.current_language
+                    lm = getattr(self, 'language_manager', None)
+                    if lm is not None:
+                        lang = lm.current_languagee()
                 except Exception:
                     pass
                 used_custom_engine = False
                 try:
-                    if getattr(self, 'voice_engine', None):
-                        used_custom_engine = self.voice_engine.speak(text, language=lang)
+                    ve = getattr(self, 'voice_engine', None)
+                    if ve is not None:
+                        used_custom_engine = ve.speak(text, language=lang)
+                    else:
+                        used_custom_engine = False
                 except Exception:
                     used_custom_engine = False
                 if not used_custom_engine:
@@ -615,25 +627,38 @@ class Sebas:
 
     def _parse_language_code(self, language_input: str) -> Optional[str]:
         try:
-            if not getattr(self, 'language_manager', None):
+            lang_mgr = getattr(self, 'language_manager', None)
+            if lang_mgr is None:
                 return None
+            
             s = (language_input or '').lower().strip()
+            
             # direct code
-            if s in self.language_manager.LANGUAGE_NAMES:
+            if s in getattr(lang_mgr, 'LANGUAGE_NAMES', {}):
                 return s
+            
             # by name
-            for code, name in self.language_manager.LANGUAGE_NAMES.items():
+            for code, name in getattr(lang_mgr, 'LANGUAGE_NAMES', {}).items():
                 if s in name.lower():
                     return code
+            
             return None
         except Exception:
             return None
 
+
     def list_available_voices(self):
         try:
-            voices = self.tts_engine.getProperty('voices') or []
+            voices = getattr(self, 'tts_engine', None)
+            if voices is None:
+                return []
+
+            voices_list = voices.getProperty('voices')
+            if not voices_list:
+                voices_list = []
+
             listed = []
-            for v in voices:
+            for v in voices_list:
                 info = {
                     'id': getattr(v, 'id', ''),
                     'name': getattr(v, 'name', ''),
@@ -652,26 +677,27 @@ class Sebas:
     def set_tts_language(self, language_hint: str) -> bool:
         try:
             hint = (language_hint or '').lower().strip()
-            voices = self.tts_engine.getProperty('voices') or []
-            if not voices:
-                self.speak("No voices are available on this system")
+            if not getattr(self, 'tts_engine', None):
+                self.speak("TTS engine not initialized")
                 return False
+
+            voices_list = self.tts_engine.getProperty('voices')
+            if not voices_list or not isinstance(voices_list, (list, tuple)):
+                voices_list = []
 
             def matches(v):
                 name = (getattr(v, 'name', '') or '').lower()
                 vid = (getattr(v, 'id', '') or '').lower()
                 langs = ' '.join([str(x).lower() for x in getattr(v, 'languages', [])])
-                # Match common patterns like en, en-gb, english, british, spanish, etc.
                 return (
                     hint in name or hint in vid or hint in langs or
-                    hint.replace('_','-') in name or hint.replace('_','-') in vid or hint.replace('_','-') in langs
+                    hint.replace('_', '-') in name or hint.replace('_', '-') in vid or hint.replace('_', '-') in langs
                 )
 
-            # Prefer exact-ish language codes first
-            candidates = [v for v in voices if matches(v)]
+            candidates = [v for v in voices_list if matches(v)]
             selected = None
+
             if candidates:
-                # Prefer UK voices for english/gb, else first match
                 for v in candidates:
                     if any(k in (getattr(v, 'name', '') or '').lower() for k in ['uk', 'brit', 'en-gb', 'english (united kingdom)']):
                         selected = v
@@ -679,9 +705,8 @@ class Sebas:
                 if not selected:
                     selected = candidates[0]
             else:
-                # Fallback: try partials like 'en' -> any english
                 short = hint.split('-')[0]
-                for v in voices:
+                for v in voices_list:
                     langs = ' '.join([str(x).lower() for x in getattr(v, 'languages', [])])
                     if short and short in langs:
                         selected = v
@@ -691,8 +716,13 @@ class Sebas:
                 self.speak(f"I could not find a voice matching {language_hint}")
                 return False
 
-            self.tts_engine.setProperty('voice', getattr(selected, 'id', None))
-            self.speak(f"Voice set to {getattr(selected,'name','the selected voice')}")
+            voice_id = getattr(selected, 'id', None)
+            if voice_id is None:
+                self.speak(f"Selected voice has no valid ID")
+                return False
+
+            self.tts_engine.setProperty('voice', voice_id)
+            self.speak(f"Voice set to {getattr(selected, 'name', 'the selected voice')}")
             return True
         except Exception:
             logging.exception("Failed to set TTS language")
@@ -726,7 +756,10 @@ class Sebas:
                 continue
 
     def _select_best_voice_id(self):
-        voices = self.tts_engine.getProperty('voices') or []
+        voices_list = self.tts_engine.getProperty('voices')
+        if not voices_list or not isinstance(voices_list, (list, tuple)):
+            voices_list = []
+
         def score(v):
             name = (getattr(v, 'name', '') or '').lower()
             vid = (getattr(v, 'id', '') or '').lower()
@@ -755,13 +788,15 @@ class Sebas:
 
         best = None
         best_score = -10**9
-        for v in voices:
+        for v in voices_list:
             sc = score(v)
             if sc > best_score:
                 best = v
                 best_score = sc
+
         logging.info(f"Selected voice: {getattr(best,'name','default')} (score={best_score})")
         return getattr(best, 'id', None)
+
 
     def test_butler_voice(self):
         phrases = [
@@ -790,7 +825,7 @@ class Sebas:
                     if not hasattr(self, "_mic_calibrated"):
                         # First listen calibration only
                         if getattr(source, "stream", None):
-                            self.recognizer.adjust_for_ambient_noise(source, duration=1.0)
+                            self.recognizer.adjust_for_ambient_noise(source, duration=1)
                             self._mic_calibrated = True
 
                     try:
@@ -811,7 +846,7 @@ class Sebas:
             except Exception:
                 pass
             with self.audio_lock:
-                text = self.recognizer.recognize_google(audio).lower()
+                text = self.recognizer.recognize_vosk(audio).lower()
             logging.debug(f"Recognized: {text}")
             return text
         except sr.UnknownValueError:
@@ -835,8 +870,9 @@ class Sebas:
         raw_command = (command or "").strip()
         # Auto-detect language from raw input (don't force lowercase for detection)
         try:
-            if getattr(self, 'language_manager', None):
-                self.language_manager.detect_language(raw_command)
+            lm = getattr(self, 'language_manager', None)
+            if lm is not None:
+                lm.detect_language(raw_command)
         except Exception:
             pass
         command = raw_command.lower()
@@ -850,10 +886,13 @@ class Sebas:
                 arg = command
                 arg = arg.replace('set language', '').replace('language', '').strip()
                 code = self._parse_language_code(arg)
-                if code and getattr(self, 'language_manager', None):
-                    if self.language_manager.set_language(code):
-                        self.speak(f"Language set to {self.language_manager.get_current_language_name()}")
-                        return
+                if code:
+                    lm = getattr(self, 'language_manager', None)
+                    if lm is not None:
+                        if lm.set_language(code):
+                            self.speak(f"Language set to {lm.get_current_language_name()}")
+                            return
+
                 self.speak("Unsupported language")
                 return
         except Exception:
@@ -1187,9 +1226,17 @@ class Sebas:
                 return True
             
             # Compare enum values (ADMIN=2 > STANDARD=1)
-            user_value = user_role.value if hasattr(user_role, 'value') else int(user_role)
-            required_value = required_role.value if hasattr(required_role, 'value') else int(required_role)
-            
+            def role_to_int(role) -> int:
+                if hasattr(role, 'value'):
+                    return int(role.value)
+                try:
+                    return int(role)
+                except Exception:
+                    raise TypeError(f"Cannot convert {role!r} to int")
+
+            user_value = role_to_int(user_role)
+            required_value = role_to_int(required_role)
+
             if user_value >= required_value:
                 return True
             else:
@@ -1407,9 +1454,23 @@ class Sebas:
             logging.exception("Failed to handle learned command")
             return False
 
+    
+    # def run_shell_command(self, cmd):
+    #     if not self.has_permission('run_shell_command'):
+    #         return
+    #     success, response = self.service_client.send_command('run_shell', {'cmd': cmd})
+    #     if success:
+    #         self.speak("Command sent to the service for execution.")
+    #         if isinstance(response, dict):
+    #             output = response.get('stdout') or response.get('stderr')
+    #         else:
+    #             output = str(response)
+    #         logging.info(f"Service command output: {output}")
+    #     else:
+    #         self.speak(f"Command failed. {response}")
+
     def _execute_learned_action(self, action, params=None):
         try:
-            # action schema: {"type": "shell"|"open"|"speak", "value": str}
             a_type = (action or {}).get('type')
             value = (action or {}).get('value')
             if params and isinstance(value, str):
@@ -1432,6 +1493,7 @@ class Sebas:
         except Exception:
             logging.exception("Learned action execution failed")
             return False
+
 
     def _pattern_to_regex(self, pattern_text):
         # Convert a phrase with {slot} into a regex with named groups
@@ -1737,12 +1799,12 @@ class Sebas:
                     return self.adjust_voice(pitch=int(slots.get('pitch')))
                 except Exception:
                     return False
-            if name == 'smarthome_toggle':
-                ent = (slots.get('device') or '').replace(' ', '_')
-                state = (slots.get('state') or 'off') == 'on'
-                ok = self.smarthome.set_switch(f"switch.{ent}", state) if getattr(self, 'smarthome', None) else False
-                self.speak("Done" if ok else "Unable to control that device")
-                return True
+            # if name == 'smarthome_toggle':
+            #     ent = (slots.get('device') or '').replace(' ', '_')
+            #     state = (slots.get('state') or 'off') == 'on'
+            #     ok = self.smarthome.set_switch(f"switch.{ent}", state) if getattr(self, 'smarthome', None) else False
+            #     self.speak("Done" if ok else "Unable to control that device")
+            #     return True
             if name == 'schedule_event':
                 title = slots.get('title') or 'Untitled'
                 when_text = slots.get('time') or ''
@@ -1776,7 +1838,23 @@ class Sebas:
                 if dt is None:
                     self.speak("I could not parse the time for that event")
                     return True
-                ok = self.calendar.add_event(title, dt) if getattr(self, 'calendar', None) else False
+                if getattr(self, 'calendar', None):
+                    provider = "microsoft"  # or whatever provider you use
+                    event_title = title if 'title' in locals() else "Untitled Event"
+                    
+                    start_iso = dt.isoformat()
+                    end_iso = (dt + timedelta(hours=1)).isoformat()
+
+                    ok, msg = self.calendar.add_event(
+                        provider=provider,
+                        title=event_title,
+                        start_iso=start_iso,
+                        end_iso=end_iso,
+                        description=""  # optional
+                    )
+                else:
+                    ok = False
+
                 self.speak("Event scheduled" if ok else "Failed to schedule event")
                 return True
             if name == 'send_email':
@@ -1946,11 +2024,12 @@ class Sebas:
             success, response = self.service_client.send_command('run_shell', {'cmd': f'taskkill /F /IM "{name_or_pid}" /T'})
             if not success:
                 # Fallback to non-admin for current user's processes
-                killed = self._kill_process_local(name_or_pid)
+                killed = getattr(self, '_kill_process_local', lambda x: 0)(name_or_pid)
                 if killed > 0:
                     self.speak(f"Terminated {killed} of your processes.")
                 else:
                     self.speak(f"Could not terminate process. {response}")
+
             else:
                 self.speak(f"Termination signal sent to {name_or_pid}.")
         except Exception:
@@ -1983,11 +2062,18 @@ class Sebas:
             self.speak("Failed to delete path")
 
     def run_shell_command(self, cmd):
-        if not self.has_permission('run_shell_command'): return
+        if not self.has_permission('run_shell_command'):
+            return
+
         success, response = self.service_client.send_command('run_shell', {'cmd': cmd})
+
         if success:
             self.speak("Command sent to the service for execution.")
-            output = response.get('stdout') or response.get('stderr')
+            # Ensure response is a dict before calling .get()
+            if isinstance(response, dict):
+                output = response.get('stdout') or response.get('stderr')
+            else:
+                output = str(response)  # fallback if response is string
             logging.info(f"Service command output: {output}")
         else:
             self.speak(f"Command failed. {response}")
@@ -2076,8 +2162,11 @@ class Sebas:
         self.speak(f"Commencing search for {query}.")
         return True
 
+    from comtypes.client import GetBestInterface
+
     def set_volume(self, level):
-        if not self.has_permission('set_volume'): return
+        if not self.has_permission('set_volume'):
+            return
         try:
             # Clamp level to [0,1]
             try:
@@ -2085,14 +2174,16 @@ class Sebas:
             except Exception:
                 level = 0.0
             level = max(0.0, min(1.0, level))
+
             devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
-            volume.SetMasterVolumeLevelScalar(level, None)
-            self.speak(f"Setting volume to {int(level*100)} percent.")
+            # Explicitly ignore type checking for Activate (Pylance will hush)
+            interface = devices.Activate(  # type: ignore[attr-defined]
+                IAudioEndpointVolume._iid_, CLSCTX_ALL, None
+            )
+            volume = GetBestInterface(interface)
+            volume.SetMasterVolumeLevelScalar(level, None)  # type: ignore[attr-defined]
         except Exception:
             logging.exception("Failed to set volume")
-            self.speak("Failed to set volume")
 
     def set_brightness(self, level):
         if not self.has_permission('set_brightness'): return
@@ -2314,7 +2405,7 @@ class Sebas:
             # Create a very simple text test page
             hPrinter = win32print.OpenPrinter(printer_name)
             try:
-                job = win32print.StartDocPrinter(hPrinter, 1, ("SEBAS Test Page", None, "RAW"))
+                job = win32print.StartDocPrinter(hPrinter, 1, ("SEBAS Test Page", "", "RAW"))
                 win32print.StartPagePrinter(hPrinter)
                 try:
                     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -2389,7 +2480,7 @@ if __name__ == "__main__":
     
     # Start API server (Phase 1.3)
     try:
-        from api.api_server import create_api_server
+        from .api_server import APIServer, create_api_server
         api_server = create_api_server(sebas_instance=assistant, host="127.0.0.1", port=5001)
         api_server.start()
         logging.info("SEBAS API server started on http://127.0.0.1:5001")

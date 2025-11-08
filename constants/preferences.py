@@ -55,7 +55,7 @@ class PreferenceStore:
                 return Role[ad_role.upper()]
         
         # Fallback to manual role setting
-        role_name = self.get_pref('user_role', 'STANDARD').upper()
+        role_name = (self.get_pref('user_role') or 'STANDARD').upper()
         return Role[role_name] if role_name in Role.__members__ else Role.STANDARD
 
     def set_user_role(self, role: Role, from_ad: bool = False):

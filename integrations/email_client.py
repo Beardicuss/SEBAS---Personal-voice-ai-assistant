@@ -43,51 +43,77 @@ class EmailClient:
             return False
         msg = MIMEText(body, 'plain', 'utf-8')
         msg["Subject"] = subject
-        msg["From"] = from_addr or self.username
+        msg["From"] = str(from_addr or self.username or "")
         msg["To"] = to_addr
         try:
-            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as s:
+            host = str(self.smtp_host or "")
+            port = self.smtp_port or 25  # default SMTP port if None
+            username = str(self.username or "")
+            password = str(self.password or "")
+
+            with smtplib.SMTP(host, port, timeout=10) as s:
                 if self.use_tls:
                     s.starttls()
-                s.login(self.username, self.password)
+                s.login(username, password)
                 s.send_message(msg)
             return True
         except Exception:
             logging.exception("EmailClient.send_mail failed")
             return False
 
+import os
+import imaplib
+import email
+from typing import List, Dict, Tuple
+from datetime import datetime
 
 def fetch_email_summaries(limit: int = 10) -> Tuple[bool, List[Dict]]:
-	"""Fetch recent email summaries from INBOX."""
-	imap_host = os.environ.get('EMAIL_HOST_IMAP')
-	imap_port = int(os.environ.get('EMAIL_PORT_IMAP', '993'))
-	username = os.environ.get('EMAIL_USERNAME')
-	password = os.environ.get('EMAIL_PASSWORD')
-	if not (imap_host and username and password):
-		return False, [{"error": "Missing IMAP env configuration"}]
-	items: List[Dict] = []
-	try:
-		M = imaplib.IMAP4_SSL(imap_host, imap_port)
-		M.login(username, password)
-		M.select('INBOX')
-		status, data = M.search(None, 'ALL')
-		if status != 'OK':
-			M.logout()
-			return False, [{"error": "Search failed"}]
-		ids = data[0].split()
-		for msg_id in reversed(ids[-limit:]):
-			status, msg_data = M.fetch(msg_id, '(RFC822.HEADER)')
-			if status != 'OK':
-				continue
-			msg = email.message_from_bytes(msg_data[0][1])
-			subj = msg.get('Subject', '')
-			from_ = msg.get('From', '')
-			date_ = msg.get('Date', '')
-			items.append({"from": from_, "subject": subj, "date": date_})
-		M.logout()
-		return True, items
-	except Exception:
-		return False, [{"error": "IMAP fetch failed"}]
+    """Fetch recent email summaries from INBOX."""
+    imap_host = os.environ.get('EMAIL_HOST_IMAP')
+    imap_port = int(os.environ.get('EMAIL_PORT_IMAP', '993'))
+    username = os.environ.get('EMAIL_USERNAME')
+    password = os.environ.get('EMAIL_PASSWORD')
+    
+    if not (imap_host and username and password):
+        return False, [{"error": "Missing IMAP env configuration"}]
+    
+    items: List[Dict] = []
+    
+    try:
+        M = imaplib.IMAP4_SSL(imap_host, imap_port)
+        M.login(username, password)
+        M.select('INBOX')
+        
+        status, data = M.search(None, 'ALL')
+        if status != 'OK' or not data or not data[0]:
+            M.logout()
+            return False, [{"error": "Search failed"}]
+        
+        ids = data[0].split()
+        
+        for msg_id in reversed(ids[-limit:]):
+            status, msg_data = M.fetch(msg_id, '(RFC822.HEADER)')
+            if status != 'OK' or not msg_data or not msg_data[0]:
+                continue
+            
+            # Ensure the data is bytes-like
+            msg_bytes = msg_data[0][1]
+            if not isinstance(msg_bytes, (bytes, bytearray)):
+                continue
+            
+            # Parse the message safely
+            msg = email.message_from_bytes(msg_bytes)
+            subj = msg.get('Subject', '')
+            from_ = msg.get('From', '')
+            date_ = msg.get('Date', '')
+            
+            items.append({"from": from_, "subject": subj, "date": date_})
+        
+        M.logout()
+        return True, items
+    
+    except Exception:
+        return False, [{"error": "IMAP fetch failed"}]
 
 
 def send_email(to_address: str, subject: str, body: str) -> Tuple[bool, str]:

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, List, Dict
+from typing import Optional, Tuple, List, Dict, Any
 import os
 import requests
 
@@ -139,7 +139,7 @@ def update_event(provider: str, event_id: str, title: Optional[str] = None,
     tz = os.environ.get('MS_GRAPH_TIMEZONE', 'UTC')
     base = 'https://graph.microsoft.com/v1.0/me'
     url = f"{base}/events/{event_id}"
-    body: Dict[str, Dict] = {}
+    body: Dict[str, Any] = {}
     if title is not None:
         body['subject'] = title
     if description is not None:

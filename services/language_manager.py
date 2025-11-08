@@ -16,11 +16,9 @@ class LanguageManager:
         self.current_language: str = 'en'
         self.language_history: List[str] = []
         self.LANGUAGE_NAMES = {
-            "en": "English", "ru": "Russian", "es": "Spanish", "fr": "French",
-            "de": "German", "it": "Italian", "pt": "Portuguese", "pl": "Polish",
-            "hi": "Hindi", "ja": "Japanese", "ko": "Korean", "zh": "Chinese",
-            "ar": "Arabic", "tr": "Turkish", "nl": "Dutch", "sv": "Swedish",
-            "no": "Norwegian", "ka": "Georgian"
+            "en": "English", 
+            "ru": "Russian",
+            "de": "German"
         }
 
     def detect_language(self, text: str) -> str:
@@ -55,5 +53,7 @@ class LanguageManager:
 
     def get_language_name(self, code: str) -> str:
         return self.LANGUAGE_NAMES.get(code, "Unknown")
-
+    
+    def current_languagee(self) -> str:
+        return self.current_language
 

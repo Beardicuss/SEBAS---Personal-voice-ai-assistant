@@ -123,7 +123,9 @@ class ADClient:
             return False
         
         try:
-            server = Server(self.ldap_server, get_info=ALL)
+            if not self.ldap_server:
+                raise ValueError("LDAP server address not configured")
+            server = Server(str(self.ldap_server), get_info=ALL)
             
             if self.use_windows_auth and WIN32_AVAILABLE:
                 # Use Windows Integrated Authentication (NTLM)
@@ -224,7 +226,10 @@ class ADClient:
                 bind_username = username
             
             # Try to bind with provided credentials
-            server = Server(self.ldap_server, get_info=ALL)
+            if not self.ldap_server:
+                raise ValueError("LDAP server address not configured")
+            server = Server(str(self.ldap_server), get_info=ALL)
+
             test_conn = Connection(server, user=bind_username, password=password,
                                  authentication=SIMPLE, auto_bind=True)
             test_conn.unbind()
@@ -288,13 +293,17 @@ class ADClient:
                 search_base = self._get_search_base()
                 search_filter = f"(&(objectClass=user)(sAMAccountName={username}))"
                 
-                self.connection.search(search_base, search_filter, attributes=['memberOf'])
+                conn = getattr(self, 'connection', None)
+                if conn is not None:
+                    conn.search(search_base, search_filter, attributes=['memberOf'])
+
                 
-                if self.connection.entries:
+                conn = getattr(self, 'connection', None)
+                if conn and conn.entries:
                     groups = []
-                    for entry in self.connection.entries:
+                    for entry in conn.entries:
                         if hasattr(entry, 'memberOf'):
-                            for group_dn in entry.memberOf.values:
+                            for group_dn in getattr(entry.memberOf, 'values', []):
                                 # Extract CN from DN
                                 cn = group_dn.split(',')[0].replace('CN=', '')
                                 groups.append(cn)
@@ -347,10 +356,13 @@ class ADClient:
             search_filter = f"(&(objectClass=user)(sAMAccountName={username}))"
             
             attributes = ['cn', 'displayName', 'mail', 'department', 'title', 'telephoneNumber']
-            self.connection.search(search_base, search_filter, attributes=attributes, search_scope=SUBTREE)
-            
-            if self.connection.entries:
-                entry = self.connection.entries[0]
+            conn = getattr(self, 'connection', None)
+            if conn is not None:
+                conn.search(search_base, search_filter, attributes=['memberOf'])
+                        
+            conn = getattr(self, 'connection', None)
+            if conn and conn.entries:
+                entry = conn.entries[0]
                 return {
                     'username': username,
                     'display_name': str(entry.get('displayName', [''])[0]) if hasattr(entry, 'displayName') else '',
@@ -359,7 +371,7 @@ class ADClient:
                     'title': str(entry.get('title', [''])[0]) if hasattr(entry, 'title') else '',
                     'phone': str(entry.get('telephoneNumber', [''])[0]) if hasattr(entry, 'telephoneNumber') else '',
                 }
-            
+
             return None
             
         except Exception:
@@ -418,23 +430,32 @@ class ADClient:
                 attributes['department'] = department
             
             # Add user
-            self.connection.add(user_dn, attributes=attributes)
-            
-            if self.connection.result['result'] == 0:
+            conn = getattr(self, 'connection', None)
+            if conn is not None:
+                conn.add(user_dn, attributes=attributes)
+            else:
+                raise RuntimeError("LDAP connection not initialized")
+
+            conn = getattr(self, 'connection', None)
+            if conn is None:
+                raise RuntimeError("LDAP connection not initialized")
+
+            if conn.result.get('result', -1) == 0:
                 # Set password
-                self.connection.extend.microsoft.modify_password(
+                conn.extend.microsoft.modify_password(
                     user_dn,
                     new_password=password
                 )
-                
+
                 # Enable account
-                self.connection.modify(user_dn, {'userAccountControl': [('MODIFY_REPLACE', 512)]})
-                
+                conn.modify(user_dn, {'userAccountControl': [('MODIFY_REPLACE', 512)]})
+
                 logging.info(f"User {username} created successfully")
                 return True, f"User {username} created successfully"
             else:
-                error = self.connection.result.get('description', 'Unknown error')
+                error = conn.result.get('description', 'Unknown error')
                 return False, f"Failed to create user: {error}"
+
                 
         except Exception:
             logging.exception(f"Failed to create user: {username}")
@@ -459,21 +480,24 @@ class ADClient:
             search_base = self._get_search_base()
             search_filter = f"(&(objectClass=user)(sAMAccountName={username}))"
             
-            self.connection.search(search_base, search_filter, attributes=['dn'])
-            
-            if not self.connection.entries:
-                return False, f"User {username} not found"
-            
-            user_dn = str(self.connection.entries[0].entry_dn)
+            conn = getattr(self, 'connection', None)
+            if conn is not None:
+                conn.search(search_base, search_filter, attributes=['memberOf'])
+
+            conn = getattr(self, 'connection', None)
+            if conn is None or not conn.entries:
+                raise RuntimeError("No LDAP entries found")
+
+            user_dn = str(conn.entries[0].entry_dn)
             
             # Delete user
-            self.connection.delete(user_dn)
+            conn.delete(user_dn)
             
-            if self.connection.result['result'] == 0:
+            if conn.result['result'] == 0:
                 logging.info(f"User {username} deleted successfully")
                 return True, f"User {username} deleted successfully"
             else:
-                error = self.connection.result.get('description', 'Unknown error')
+                error = conn.result.get('description', 'Unknown error')
                 return False, f"Failed to delete user: {error}"
                 
         except Exception:
@@ -500,26 +524,34 @@ class ADClient:
             search_base = self._get_search_base()
             search_filter = f"(&(objectClass=user)(sAMAccountName={username}))"
             
-            self.connection.search(search_base, search_filter, attributes=['dn'])
-            
-            if not self.connection.entries:
+            conn = getattr(self, 'connection', None)
+            if conn is not None:
+                conn.search(search_base, search_filter, attributes=['memberOf'])
+                        
+            conn = getattr(self, 'connection', None)
+            if conn is None or not conn.entries:
                 return False, f"User {username} not found"
-            
-            user_dn = str(self.connection.entries[0].entry_dn)
-            
+
+            user_dn = str(conn.entries[0].entry_dn)
+
             # Modify attributes
             changes = {}
             for key, value in attributes.items():
                 changes[key] = [('MODIFY_REPLACE', value)]
             
-            self.connection.modify(user_dn, changes)
-            
-            if self.connection.result['result'] == 0:
+            conn = getattr(self, 'connection', None)
+            if conn is None:
+                raise RuntimeError("LDAP connection not initialized")
+
+            conn.modify(user_dn, changes)
+
+            if conn.result.get('result', -1) == 0:
                 logging.info(f"User {username} modified successfully")
                 return True, f"User {username} modified successfully"
             else:
-                error = self.connection.result.get('description', 'Unknown error')
+                error = conn.result.get('description', 'Unknown error')
                 return False, f"Failed to modify user: {error}"
+
                 
         except Exception:
             logging.exception(f"Failed to modify user: {username}")
@@ -545,17 +577,21 @@ class ADClient:
                 'lockoutDuration', 'pwdHistoryLength', 'pwdProperties'
             ]
             
-            self.connection.search(search_base, search_filter, attributes=attributes, search_scope=SUBTREE)
-            
-            if self.connection.entries:
-                entry = self.connection.entries[0]
+            conn = getattr(self, 'connection', None)
+            if conn is None:
+                raise RuntimeError("LDAP connection not initialized")
+
+            conn.search(search_base, search_filter, attributes=attributes, search_scope=SUBTREE)
+
+            if conn.entries:
+                entry = conn.entries[0]
                 policy = {}
-                
+
                 for attr in attributes:
                     if hasattr(entry, attr):
-                        value = entry[attr].value if hasattr(entry[attr], 'value') else entry[attr]
+                        value = getattr(entry[attr], 'value', entry[attr])
                         policy[attr] = value
-                
+
                 return policy
             
             return None
