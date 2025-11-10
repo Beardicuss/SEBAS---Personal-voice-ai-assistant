@@ -21,7 +21,7 @@ try:
     WIN32_AVAILABLE = True
 except ImportError:
     WIN32_AVAILABLE = False
-    print("Warning: pywin32 not available, some file operations may be limited")
+    logging.warning("pywin32 not available, some file operations may be limited")
 
 
 class FileSkill(BaseSkill):
@@ -299,310 +299,6 @@ class FileSkill(BaseSkill):
         if not self._is_safe_file_operation(source, destination):
             self.assistant.speak("Operation not allowed for safety reasons")
             return False
-
-    # ----------------------- Helper Methods -----------------------
-
-    def _load_recent_files(self) -> List[Dict[str, Any]]:
-        try:
-            if os.path.isfile(self.recent_files_file):
-                with open(self.recent_files_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        return data
-            return []
-        except Exception as e:
-            self.logger.exception("Failed to load recent files")
-            return []
-
-    def _save_recent_files(self):
-        try:
-            with self.recent_lock:
-                with open(self.recent_files_file, 'w', encoding='utf-8') as f:
-                    json.dump(self.recent_files, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            self.logger.exception("Failed to save recent files")
-
-    def _load_file_cache(self) -> Dict[str, Any]:
-        try:
-            if os.path.isfile(self.file_cache_file):
-                with open(self.file_cache_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            return {}
-        except Exception as e:
-            self.logger.exception("Failed to load file cache")
-            return {}
-
-    def _load_search_config(self) -> Dict[str, Any]:
-        try:
-            if os.path.isfile(self.search_config_file):
-                with open(self.search_config_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            return {}
-        except Exception as e:
-            self.logger.exception("Failed to load search config")
-            return {}
-
-    def _save_search_config(self):
-        try:
-            with open(self.search_config_file, 'w', encoding='utf-8') as f:
-                json.dump(self.search_config, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            self.logger.exception("Failed to save search config")
-
-    def _track_recent_file(self, file_path: str):
-        """Track recently opened files"""
-        try:
-            with self.recent_lock:
-                # Remove if already exists
-                self.recent_files = [f for f in self.recent_files if f['path'] != file_path]
-
-                # Add to beginning
-                self.recent_files.insert(0, {
-                    'path': file_path,
-                    'opened_at': time.time(),
-                    'basename': os.path.basename(file_path)
-                })
-
-                # Keep only last 20
-                self.recent_files = self.recent_files[:20]
-
-                # Save periodically
-                if len(self.recent_files) % 5 == 0:
-                    self._save_recent_files()
-        except Exception as e:
-            self.logger.exception("Failed to track recent file")
-
-    def _is_safe_file_operation(self, source: str, destination: str) -> bool:
-        """Check if file operation is safe"""
-        try:
-            # Get absolute paths
-            source_abs = os.path.abspath(source)
-            dest_abs = os.path.abspath(destination)
-
-            # Prevent operations on system directories
-            system_dirs = [
-                os.path.join(os.environ.get('SystemRoot', 'C:\\Windows')),
-                os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'System32'),
-                os.environ.get('ProgramFiles', ''),
-                os.environ.get('ProgramFiles(x86)', '')
-            ]
-
-            for sys_dir in system_dirs:
-                if sys_dir and (source_abs.startswith(sys_dir) or dest_abs.startswith(sys_dir)):
-                    return False
-
-            # Prevent operations in root directories
-            if len(source_abs.split(os.sep)) <= 2 or len(dest_abs.split(os.sep)) <= 2:
-                return False
-
-            return True
-        except Exception:
-            return False
-
-    def _advanced_file_search(self, query: str, file_type: str = '', location: str = '') -> List[str]:
-        """Advanced file search with multiple strategies"""
-        results = []
-
-        # Determine search paths
-        search_paths = self.default_search_paths.copy()
-        if location and os.path.isdir(location):
-            search_paths = [location]
-        elif hasattr(self, 'search_config'):
-            custom_paths = self.search_config.get('custom_search_paths', [])
-            search_paths.extend(custom_paths)
-
-        # Search each path
-        for search_path in search_paths:
-            if not os.path.exists(search_path):
-                continue
-
-            try:
-                for root, dirs, files in os.walk(search_path):
-                    # Skip excluded directories
-                    dirs[:] = [d for d in dirs if not self._is_excluded_path(os.path.join(root, d))]
-
-                    for file in files:
-                        if self._is_excluded_path(file):
-                            continue
-
-                        file_path = os.path.join(root, file)
-
-                        # Filter by file type if specified
-                        if file_type:
-                            if not fnmatch.fnmatch(file.lower(), f'*.{file_type.lower()}'):
-                                continue
-
-                        # Check if file matches query (name or content)
-                        if self._file_matches_query(file_path, query):
-                            results.append(file_path)
-
-                            # Limit results
-                            if len(results) >= 50:
-                                break
-
-                    if len(results) >= 50:
-                        break
-
-            except Exception as e:
-                self.logger.exception(f"Error searching in {search_path}")
-
-        return results
-
-    def _file_matches_query(self, file_path: str, query: str) -> bool:
-        """Check if file matches search query"""
-        query_lower = query.lower()
-        filename = os.path.basename(file_path).lower()
-
-        # Check filename
-        if query_lower in filename:
-            return True
-
-        # For text files, check content
-        if self._is_text_file(file_path):
-            try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read(10000).lower()  # Read first 10KB
-                    if query_lower in content:
-                        return True
-            except Exception:
-                pass
-
-        return False
-
-    def _is_text_file(self, file_path: str) -> bool:
-        """Check if file is a text file"""
-        mime_type, _ = mimetypes.guess_type(file_path)
-        if mime_type and mime_type.startswith('text/'):
-            return True
-
-        # Check extensions
-        text_extensions = {'.txt', '.py', '.js', '.html', '.css', '.json', '.xml', '.md', '.csv', '.log'}
-        return Path(file_path).suffix.lower() in text_extensions
-
-    def _is_excluded_path(self, path: str) -> bool:
-        """Check if path should be excluded from search"""
-        path_lower = path.lower()
-        name = os.path.basename(path_lower)
-
-        # Check exclusions
-        for exclusion in self.default_exclusions:
-            if exclusion.startswith('*.'):
-                if fnmatch.fnmatch(name, exclusion):
-                    return True
-            elif exclusion in path_lower:
-                return True
-
-        return False
-
-    def _search_by_extensions(self, extensions: List[str], location: str = '') -> List[str]:
-        """Search for files by extension patterns"""
-        results = []
-
-        search_paths = [location] if location and os.path.isdir(location) else self.default_search_paths.copy()
-        if hasattr(self, 'search_config'):
-            custom_paths = self.search_config.get('custom_search_paths', [])
-            search_paths.extend(custom_paths)
-
-        for search_path in search_paths:
-            if not os.path.exists(search_path):
-                continue
-
-            try:
-                for root, dirs, files in os.walk(search_path):
-                    dirs[:] = [d for d in dirs if not self._is_excluded_path(os.path.join(root, d))]
-
-                    for file in files:
-                        if self._is_excluded_path(file):
-                            continue
-
-                        for ext in extensions:
-                            if fnmatch.fnmatch(file.lower(), ext.lower()):
-                                results.append(os.path.join(root, file))
-                                break
-
-                        if len(results) >= 50:
-                            break
-
-                    if len(results) >= 50:
-                        break
-
-            except Exception as e:
-                self.logger.exception(f"Error searching in {search_path}")
-
-        return results
-
-    def _search_by_date(self, start_date: datetime, location: str = '') -> List[str]:
-        """Search for files modified after a certain date"""
-        results = []
-
-        search_paths = [location] if location and os.path.isdir(location) else self.default_search_paths.copy()
-        if hasattr(self, 'search_config'):
-            custom_paths = self.search_config.get('custom_search_paths', [])
-            search_paths.extend(custom_paths)
-
-        for search_path in search_paths:
-            if not os.path.exists(search_path):
-                continue
-
-            try:
-                for root, dirs, files in os.walk(search_path):
-                    dirs[:] = [d for d in dirs if not self._is_excluded_path(os.path.join(root, d))]
-
-                    for file in files:
-                        if self._is_excluded_path(file):
-                            continue
-
-                        file_path = os.path.join(root, file)
-                        try:
-                            stat = os.stat(file_path)
-                            modified_time = datetime.fromtimestamp(stat.st_mtime)
-                            if modified_time >= start_date:
-                                results.append(file_path)
-                        except Exception:
-                            continue
-
-                        if len(results) >= 50:
-                            break
-
-                    if len(results) >= 50:
-                        break
-
-            except Exception as e:
-                self.logger.exception(f"Error searching in {search_path}")
-
-        # Sort by modification time (newest first)
-        results.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-        return results
-
-    def _format_file_size(self, size_bytes: int) -> str:
-        """Format file size in human readable format"""
-        for unit in ['B', 'KB', 'MB', 'GB']:
-            if size_bytes < 1024.0:
-                return f"{size_bytes:.1f} {unit}"
-            size_bytes /= 1024.0
-        return f"{size_bytes:.1f} TB"
-
-    def _get_file_type(self, file_path: str) -> str:
-        """Get human readable file type"""
-        mime_type, _ = mimetypes.guess_type(file_path)
-        if mime_type:
-            return mime_type
-
-        # Fallback to extension-based detection
-        ext = Path(file_path).suffix.lower()
-        type_map = {
-            '.txt': 'Text file',
-            '.pdf': 'PDF document',
-            '.doc': 'Word document',
-            '.docx': 'Word document',
-            '.xls': 'Excel spreadsheet',
-            '.xlsx': 'Excel spreadsheet',
-            '.jpg': 'JPEG image',
-            '.png': 'PNG image',
-            '.mp4': 'MP4 video',
-            '.mp3': 'MP3 audio'
-        }
-        return type_map.get(ext, f"{ext.upper()} file" if ext else "Unknown file type")
 
         try:
             if os.path.isdir(source):
@@ -1160,3 +856,308 @@ class FileSkill(BaseSkill):
             self.logger.exception("cloud_backup failed")
             self.assistant.speak("Cloud backup failed")
             return False
+
+    # ----------------------- Helper Methods -----------------------
+
+    def _load_recent_files(self) -> List[Dict[str, Any]]:
+        try:
+            if os.path.isfile(self.recent_files_file):
+                with open(self.recent_files_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        return data
+            return []
+        except Exception as e:
+            self.logger.exception("Failed to load recent files")
+            return []
+
+    def _save_recent_files(self):
+        try:
+            with self.recent_lock:
+                with open(self.recent_files_file, 'w', encoding='utf-8') as f:
+                    json.dump(self.recent_files, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            self.logger.exception("Failed to save recent files")
+
+    def _load_file_cache(self) -> Dict[str, Any]:
+        try:
+            if os.path.isfile(self.file_cache_file):
+                with open(self.file_cache_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return {}
+        except Exception as e:
+            self.logger.exception("Failed to load file cache")
+            return {}
+
+    def _load_search_config(self) -> Dict[str, Any]:
+        try:
+            if os.path.isfile(self.search_config_file):
+                with open(self.search_config_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return {}
+        except Exception as e:
+            self.logger.exception("Failed to load search config")
+            return {}
+
+    def _save_search_config(self):
+        try:
+            with open(self.search_config_file, 'w', encoding='utf-8') as f:
+                json.dump(self.search_config, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            self.logger.exception("Failed to save search config")
+
+    def _track_recent_file(self, file_path: str):
+        """Track recently opened files"""
+        try:
+            with self.recent_lock:
+                # Remove if already exists
+                self.recent_files = [f for f in self.recent_files if f['path'] != file_path]
+
+                # Add to beginning
+                self.recent_files.insert(0, {
+                    'path': file_path,
+                    'opened_at': time.time(),
+                    'basename': os.path.basename(file_path)
+                })
+
+                # Keep only last 20
+                self.recent_files = self.recent_files[:20]
+
+                # Save periodically
+                if len(self.recent_files) % 5 == 0:
+                    self._save_recent_files()
+        except Exception as e:
+            self.logger.exception("Failed to track recent file")
+
+    def _is_safe_file_operation(self, source: str, destination: str) -> bool:
+        """Check if file operation is safe"""
+        try:
+            # Get absolute paths
+            source_abs = os.path.abspath(source)
+            dest_abs = os.path.abspath(destination)
+
+            # Prevent operations on system directories
+            system_dirs = [
+                os.path.join(os.environ.get('SystemRoot', 'C:\\Windows')),
+                os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'System32'),
+                os.environ.get('ProgramFiles', ''),
+                os.environ.get('ProgramFiles(x86)', '')
+            ]
+
+            for sys_dir in system_dirs:
+                if sys_dir and (source_abs.startswith(sys_dir) or dest_abs.startswith(sys_dir)):
+                    return False
+
+            # Prevent operations in root directories
+            if len(source_abs.split(os.sep)) <= 2 or len(dest_abs.split(os.sep)) <= 2:
+                return False
+
+            return True
+        except Exception:
+            return False
+
+    def _advanced_file_search(self, query: str, file_type: str = '', location: str = '') -> List[str]:
+        """Advanced file search with multiple strategies"""
+        results = []
+
+        # Determine search paths
+        search_paths = self.default_search_paths.copy()
+        if location and os.path.isdir(location):
+            search_paths = [location]
+        elif hasattr(self, 'search_config'):
+            custom_paths = self.search_config.get('custom_search_paths', [])
+            search_paths.extend(custom_paths)
+
+        # Search each path
+        for search_path in search_paths:
+            if not os.path.exists(search_path):
+                continue
+
+            try:
+                for root, dirs, files in os.walk(search_path):
+                    # Skip excluded directories
+                    dirs[:] = [d for d in dirs if not self._is_excluded_path(os.path.join(root, d))]
+
+                    for file in files:
+                        if self._is_excluded_path(file):
+                            continue
+
+                        file_path = os.path.join(root, file)
+
+                        # Filter by file type if specified
+                        if file_type:
+                            if not fnmatch.fnmatch(file.lower(), f'*.{file_type.lower()}'):
+                                continue
+
+                        # Check if file matches query (name or content)
+                        if self._file_matches_query(file_path, query):
+                            results.append(file_path)
+
+                            # Limit results
+                            if len(results) >= 50:
+                                break
+
+                    if len(results) >= 50:
+                        break
+
+            except Exception as e:
+                self.logger.exception(f"Error searching in {search_path}")
+
+        return results
+
+    def _file_matches_query(self, file_path: str, query: str) -> bool:
+        """Check if file matches search query"""
+        query_lower = query.lower()
+        filename = os.path.basename(file_path).lower()
+
+        # Check filename
+        if query_lower in filename:
+            return True
+
+        # For text files, check content
+        if self._is_text_file(file_path):
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(10000).lower()  # Read first 10KB
+                    if query_lower in content:
+                        return True
+            except Exception:
+                pass
+
+        return False
+
+    def _is_text_file(self, file_path: str) -> bool:
+        """Check if file is a text file"""
+        mime_type, _ = mimetypes.guess_type(file_path)
+        if mime_type and mime_type.startswith('text/'):
+            return True
+
+        # Check extensions
+        text_extensions = {'.txt', '.py', '.js', '.html', '.css', '.json', '.xml', '.md', '.csv', '.log'}
+        return Path(file_path).suffix.lower() in text_extensions
+
+    def _is_excluded_path(self, path: str) -> bool:
+        """Check if path should be excluded from search"""
+        path_lower = path.lower()
+        name = os.path.basename(path_lower)
+
+        # Check exclusions
+        for exclusion in self.default_exclusions:
+            if exclusion.startswith('*.'):
+                if fnmatch.fnmatch(name, exclusion):
+                    return True
+            elif exclusion in path_lower:
+                return True
+
+        return False
+
+    def _search_by_extensions(self, extensions: List[str], location: str = '') -> List[str]:
+        """Search for files by extension patterns"""
+        results = []
+
+        search_paths = [location] if location and os.path.isdir(location) else self.default_search_paths.copy()
+        if hasattr(self, 'search_config'):
+            custom_paths = self.search_config.get('custom_search_paths', [])
+            search_paths.extend(custom_paths)
+
+        for search_path in search_paths:
+            if not os.path.exists(search_path):
+                continue
+
+            try:
+                for root, dirs, files in os.walk(search_path):
+                    dirs[:] = [d for d in dirs if not self._is_excluded_path(os.path.join(root, d))]
+
+                    for file in files:
+                        if self._is_excluded_path(file):
+                            continue
+
+                        for ext in extensions:
+                            if fnmatch.fnmatch(file.lower(), ext.lower()):
+                                results.append(os.path.join(root, file))
+                                break
+
+                        if len(results) >= 50:
+                            break
+
+                    if len(results) >= 50:
+                        break
+
+            except Exception as e:
+                self.logger.exception(f"Error searching in {search_path}")
+
+        return results
+
+    def _search_by_date(self, start_date: datetime, location: str = '') -> List[str]:
+        """Search for files modified after a certain date"""
+        results = []
+
+        search_paths = [location] if location and os.path.isdir(location) else self.default_search_paths.copy()
+        if hasattr(self, 'search_config'):
+            custom_paths = self.search_config.get('custom_search_paths', [])
+            search_paths.extend(custom_paths)
+
+        for search_path in search_paths:
+            if not os.path.exists(search_path):
+                continue
+
+            try:
+                for root, dirs, files in os.walk(search_path):
+                    dirs[:] = [d for d in dirs if not self._is_excluded_path(os.path.join(root, d))]
+
+                    for file in files:
+                        if self._is_excluded_path(file):
+                            continue
+
+                        file_path = os.path.join(root, file)
+                        try:
+                            stat = os.stat(file_path)
+                            modified_time = datetime.fromtimestamp(stat.st_mtime)
+                            if modified_time >= start_date:
+                                results.append(file_path)
+                        except Exception:
+                            continue
+
+                        if len(results) >= 50:
+                            break
+
+                    if len(results) >= 50:
+                        break
+
+            except Exception as e:
+                self.logger.exception(f"Error searching in {search_path}")
+
+        # Sort by modification time (newest first)
+        results.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        return results
+
+    def _format_file_size(self, size_bytes: int) -> str:
+        """Format file size in human readable format"""
+        size = float(size_bytes)
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size < 1024.0:
+                return f"{size:.1f} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} TB"
+
+    def _get_file_type(self, file_path: str) -> str:
+        """Get human readable file type"""
+        mime_type, _ = mimetypes.guess_type(file_path)
+        if mime_type:
+            return mime_type
+
+        # Fallback to extension-based detection
+        ext = Path(file_path).suffix.lower()
+        type_map = {
+            '.txt': 'Text file',
+            '.pdf': 'PDF document',
+            '.doc': 'Word document',
+            '.docx': 'Word document',
+            '.xls': 'Excel spreadsheet',
+            '.xlsx': 'Excel spreadsheet',
+            '.jpg': 'JPEG image',
+            '.png': 'PNG image',
+            '.mp4': 'MP4 video',
+            '.mp3': 'MP3 audio'
+        }
+        return type_map.get(ext, f"{ext.upper()} file" if ext else "Unknown file type")

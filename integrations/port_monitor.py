@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Port Monitoring and Blocking
-Phase 2.2: Port monitoring and blocking
+Phase 2.2 (Hardened)
 """
 
 import logging
@@ -9,13 +9,12 @@ import psutil
 import socket
 import threading
 import time
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Callable
 from datetime import datetime
 from enum import Enum
 
 
 class PortState(Enum):
-    """Port states"""
     LISTENING = "listening"
     ESTABLISHED = "established"
     TIME_WAIT = "time_wait"
@@ -24,201 +23,174 @@ class PortState(Enum):
 
 
 class PortMonitor:
-    """
-    Monitors network ports and connections.
-    """
-    
+    """Monitors network ports and triggers callbacks on changes."""
+
     def __init__(self):
-        """Initialize Port Monitor."""
         self.monitored_ports: Set[int] = set()
         self.blocked_ports: Set[int] = set()
         self.monitoring_thread: Optional[threading.Thread] = None
         self.running = False
-        self.alert_callbacks: List[callable] = []
-    
+        self.alert_callbacks: List[Callable] = []
+        self._last_connection_count: Dict[int, int] = {}
+        self.lock = threading.Lock()
+
+    # --------------------------------------------------------------
+    # CONNECTIONS
+    # --------------------------------------------------------------
     def get_port_connections(self, port: Optional[int] = None) -> List[Dict]:
-        """
-        Get connections for a specific port or all ports.
-        
-        Args:
-            port: Optional port number to filter
-            
-        Returns:
-            List of connection information dicts
-        """
+        """Return all active connections, optionally filtered by port."""
         try:
-            connections = psutil.net_connections(kind='inet')
-            
-            result = []
+            connections = psutil.net_connections(kind="inet")
+            results = []
             for conn in connections:
-                if port is None or conn.laddr.port == port or (conn.raddr and conn.raddr.port == port):
-                    conn_info = {
-                        'local_address': f"{conn.laddr.ip}:{conn.laddr.port}" if conn.laddr else "N/A",
-                        'remote_address': f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else "N/A",
-                        'status': conn.status,
-                        'pid': conn.pid,
-                        'family': str(conn.family),
-                        'type': str(conn.type)
-                    }
-                    result.append(conn_info)
-            
-            return result
-            
+                if port is not None:
+                    if not (
+                        (conn.laddr and conn.laddr[1] == port)
+                        or (conn.raddr and conn.raddr[1] == port)
+                    ):
+                        continue
+                results.append({
+                    "local_address": f"{conn.laddr[0]}:{conn.laddr[1]}" if conn.laddr else "N/A",
+                    "remote_address": f"{conn.raddr[0]}:{conn.raddr[1]}" if conn.raddr else "N/A",
+                    "status": conn.status,
+                    "pid": conn.pid,
+                    "family": str(conn.family),
+                    "type": str(conn.type),
+                })
+            return results
         except Exception:
-            logging.exception("Failed to get port connections")
+            logging.exception("get_port_connections failed")
             return []
-    
+
     def get_listening_ports(self) -> List[Dict]:
-        """
-        Get all listening ports.
-        
-        Returns:
-            List of listening port information dicts
-        """
+        """Return all listening ports with process info."""
         try:
-            connections = psutil.net_connections(kind='inet')
-            
-            listening = {}
-            for conn in connections:
-                if conn.status == 'LISTEN' and conn.laddr:
-                    port = conn.laddr.port
-                    if port not in listening:
-                        listening[port] = {
-                            'port': port,
-                            'address': conn.laddr.ip,
-                            'pid': conn.pid,
-                            'processes': []
-                        }
-                    if conn.pid:
+            conns = psutil.net_connections(kind="inet")
+            listening: Dict[int, Dict] = {}
+            for c in conns:
+                if c.status == "LISTEN" and c.laddr:
+                    port = c.laddr[1]
+                    entry = listening.setdefault(port, {
+                        "port": port,
+                        "address": c.laddr[0],
+                        "pid": c.pid,
+                        "processes": []
+                    })
+                    if c.pid:
                         try:
-                            proc = psutil.Process(conn.pid)
-                            listening[port]['processes'].append(proc.name())
-                        except:
+                            entry["processes"].append(psutil.Process(c.pid).name())
+                        except Exception:
                             pass
-            
             return list(listening.values())
-            
         except Exception:
-            logging.exception("Failed to get listening ports")
+            logging.exception("get_listening_ports failed")
             return []
-    
-    def monitor_port(self, port: int, callback: Optional[callable] = None):
-        """
-        Start monitoring a specific port.
-        
-        Args:
-            port: Port number to monitor
-            callback: Optional callback function when port activity detected
-        """
-        self.monitored_ports.add(port)
-        if callback:
-            self.alert_callbacks.append(callback)
-        
+
+    # --------------------------------------------------------------
+    # MONITORING
+    # --------------------------------------------------------------
+    def monitor_port(self, port: int, callback: Optional[Callable] = None):
+        """Add port to monitor list."""
+        with self.lock:
+            self.monitored_ports.add(port)
+            if callback:
+                self.alert_callbacks.append(callback)
         if not self.running:
             self._start_monitoring()
-    
+
     def stop_monitoring_port(self, port: int):
-        """Stop monitoring a specific port."""
-        self.monitored_ports.discard(port)
-    
+        with self.lock:
+            self.monitored_ports.discard(port)
+
     def _start_monitoring(self):
-        """Start background monitoring thread."""
+        """Spawn background monitoring thread."""
         if self.monitoring_thread and self.monitoring_thread.is_alive():
             return
-        
         self.running = True
         self.monitoring_thread = threading.Thread(target=self._monitoring_loop, daemon=True)
         self.monitoring_thread.start()
-    
+
     def _monitoring_loop(self):
-        """Background monitoring loop."""
+        """Continuously scan monitored ports for changes."""
         while self.running:
             try:
-                if self.monitored_ports:
-                    for port in self.monitored_ports:
-                        connections = self.get_port_connections(port)
-                        if connections:
-                            for callback in self.alert_callbacks:
-                                try:
-                                    callback(port, connections)
-                                except Exception:
-                                    logging.exception("Error in port monitoring callback")
-                
-                time.sleep(5)  # Check every 5 seconds
-            except Exception:
-                logging.exception("Error in port monitoring loop")
+                with self.lock:
+                    ports = list(self.monitored_ports)
+                    callbacks = list(self.alert_callbacks)
+
+                if not ports:
+                    time.sleep(5)
+                    continue
+
+                conns = psutil.net_connections(kind="inet")
+                for port in ports:
+                    matches = [
+                        c for c in conns
+                        if (c.laddr and c.laddr[1] == port)
+                        or (c.raddr and c.raddr[1] == port)
+                    ]
+                    prev = self._last_connection_count.get(port, 0)
+                    if len(matches) != prev:
+                        self._last_connection_count[port] = len(matches)
+                        for cb in callbacks:
+                            try:
+                                cb(port, matches)
+                            except Exception:
+                                logging.exception("port_monitor callback failed")
                 time.sleep(5)
-    
-    def test_port(self, host: str, port: int, timeout: int = 5) -> Tuple[bool, str]:
-        """
-        Test if a port is open on a host.
-        
-        Args:
-            host: Hostname or IP address
-            port: Port number
-            timeout: Timeout in seconds
-            
-        Returns:
-            Tuple of (is_open, message)
-        """
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(timeout)
-            result = sock.connect_ex((host, port))
-            sock.close()
-            
-            if result == 0:
-                return True, f"Port {port} is open on {host}"
-            else:
-                return False, f"Port {port} is closed on {host}"
-                
-        except socket.gaierror:
-            return False, f"Could not resolve hostname: {host}"
-        except Exception:
-            logging.exception(f"Failed to test port {port} on {host}")
-            return False, f"Failed to test port {port}"
-    
-    def get_port_statistics(self) -> Dict[str, int]:
-        """
-        Get port statistics.
-        
-        Returns:
-            Dict with port statistics
-        """
-        try:
-            connections = psutil.net_connections(kind='inet')
-            
-            stats = {
-                'total_connections': len(connections),
-                'listening': 0,
-                'established': 0,
-                'time_wait': 0,
-                'close_wait': 0,
-                'other': 0
-            }
-            
-            for conn in connections:
-                status = conn.status
-                if status == 'LISTEN':
-                    stats['listening'] += 1
-                elif status == 'ESTABLISHED':
-                    stats['established'] += 1
-                elif status == 'TIME_WAIT':
-                    stats['time_wait'] += 1
-                elif status == 'CLOSE_WAIT':
-                    stats['close_wait'] += 1
-                else:
-                    stats['other'] += 1
-            
-            return stats
-            
-        except Exception:
-            logging.exception("Failed to get port statistics")
-            return {}
-    
+            except Exception:
+                logging.exception("port_monitor loop error")
+                time.sleep(5)
+
     def stop_monitoring(self):
-        """Stop port monitoring."""
+        """Stop monitoring thread cleanly."""
         self.running = False
         if self.monitoring_thread:
             self.monitoring_thread.join(timeout=5)
 
+    # --------------------------------------------------------------
+    # UTILITIES
+    # --------------------------------------------------------------
+    def test_port(self, host: str, port: int, timeout: int = 5) -> Tuple[bool, str]:
+        """Check if a port is open on a host."""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(timeout)
+                result = sock.connect_ex((host, port))
+            if result == 0:
+                return True, f"Port {port} is open on {host}"
+            return False, f"Port {port} is closed on {host}"
+        except socket.gaierror:
+            return False, f"Could not resolve hostname: {host}"
+        except Exception:
+            logging.exception("test_port failed")
+            return False, f"Failed to test port {port}"
+
+    def get_port_statistics(self) -> Dict[str, int]:
+        """Return a summary of current port states."""
+        try:
+            conns = psutil.net_connections(kind="inet")
+            stats = {
+                PortState.LISTENING.value: 0,
+                PortState.ESTABLISHED.value: 0,
+                PortState.TIME_WAIT.value: 0,
+                PortState.CLOSE_WAIT.value: 0,
+                PortState.UNKNOWN.value: 0,
+                "total_connections": len(conns)
+            }
+            for c in conns:
+                s = c.status.upper()
+                if s == "LISTEN":
+                    stats[PortState.LISTENING.value] += 1
+                elif s == "ESTABLISHED":
+                    stats[PortState.ESTABLISHED.value] += 1
+                elif s == "TIME_WAIT":
+                    stats[PortState.TIME_WAIT.value] += 1
+                elif s == "CLOSE_WAIT":
+                    stats[PortState.CLOSE_WAIT.value] += 1
+                else:
+                    stats[PortState.UNKNOWN.value] += 1
+            return stats
+        except Exception:
+            logging.exception("get_port_statistics failed")
+            return {}

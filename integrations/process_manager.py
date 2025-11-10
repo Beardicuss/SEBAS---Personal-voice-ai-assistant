@@ -1,23 +1,15 @@
-# -*- coding: utf-8 -*-
-"""
-Process Management
-Phase 2.1: Process priority manipulation and affinity setting
-"""
-
 import logging
-import psutil
 import platform
-from typing import Optional, List, Dict, Tuple
+import subprocess
+import psutil
+import ctypes
+from typing import Optional, Dict, List, Tuple
 from enum import Enum
 
+WINDOWS_AVAILABLE = platform.system() == "Windows"
+
 # Windows-specific imports
-try:
-    import ctypes
-    from ctypes import wintypes
-    WINDOWS_AVAILABLE = True
-except ImportError:
-    WINDOWS_AVAILABLE = False
-    logging.warning("Windows-specific process management not available")
+
 
 
 class ProcessPriority(Enum):
@@ -130,6 +122,8 @@ class ProcessManager:
             
             # Validate CPU cores
             cpu_count = psutil.cpu_count()
+            if cpu_count is None:
+                return False, "Could not determine CPU count"
             if not all(0 <= core < cpu_count for core in cpu_cores):
                 return False, f"Invalid CPU core numbers. System has {cpu_count} cores."
             
@@ -204,4 +198,3 @@ class ProcessManager:
         except Exception:
             logging.exception(f"Failed to get info for process {process_id}")
             return None
-

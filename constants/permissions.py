@@ -170,6 +170,18 @@ _INTENT_PERMISSIONS: Dict[str, Role] = {
     'clear_context': Role.STANDARD,
     'record_correction': Role.STANDARD,
     'resolve_ambiguous_intent': Role.STANDARD,
+
+    'run_compliance_check': Role.ADMIN,
+    'check_uac_compliance': Role.ADMIN,
+    'check_authentication_compliance': Role.ADMIN,
+    'check_network_compliance': Role.ADMIN,
+    'check_system_hardening': Role.ADMIN,
+
+    'log_activity': Role.STANDARD,  # Non-privileged
+    'get_activity_log': Role.STANDARD,
+    'get_audit_events': Role.ADMIN,
+    'generate_compliance_report': Role.ADMIN,
+    'verify_security_policy': Role.ADMIN,
 }
 
 

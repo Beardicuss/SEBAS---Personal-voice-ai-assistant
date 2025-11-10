@@ -73,9 +73,9 @@ class Workflow:
         self.variables: Dict[str, Any] = {}
         self.status = WorkflowStatus.PENDING
         self.created_at = datetime.now()
-        self.started_at = None
-        self.completed_at = None
-        self.error = None
+        self.started_at: Optional[datetime] = None
+        self.completed_at: Optional[datetime] = None
+        self.error: Optional[str] = None
     
     def add_step(self, step: WorkflowStep):
         """Add a step to the workflow."""
@@ -415,4 +415,3 @@ class AutomationEngine:
         except Exception:
             logging.exception(f"Failed to load workflow from {file_path}")
             return None
-

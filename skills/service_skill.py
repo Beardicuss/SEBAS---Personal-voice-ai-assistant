@@ -69,6 +69,9 @@ class ServiceSkill(BaseSkill):
     
     def _handle_start_service(self, slots: dict) -> bool:
         """Handle start service command."""
+        if self.service_manager is None:
+            self.assistant.speak("Service manager not available")
+            return False
         if not self.assistant.has_permission('start_service'):
             return False
         
@@ -94,6 +97,9 @@ class ServiceSkill(BaseSkill):
     
     def _handle_stop_service(self, slots: dict) -> bool:
         """Handle stop service command."""
+        if self.service_manager is None:
+            self.assistant.speak("Service manager not available")
+            return False
         if not self.assistant.has_permission('stop_service'):
             return False
         
@@ -119,6 +125,9 @@ class ServiceSkill(BaseSkill):
     
     def _handle_restart_service(self, slots: dict) -> bool:
         """Handle restart service command."""
+        if self.service_manager is None:
+            self.assistant.speak("Service manager not available")
+            return False
         if not self.assistant.has_permission('restart_service'):
             return False
         
@@ -144,6 +153,9 @@ class ServiceSkill(BaseSkill):
     
     def _handle_get_service_status(self, slots: dict) -> bool:
         """Handle get service status command."""
+        if self.service_manager is None:
+            self.assistant.speak("Service manager not available")
+            return False
         try:
             service_name = slots.get('service_name')
             if not service_name:
@@ -167,6 +179,9 @@ class ServiceSkill(BaseSkill):
     
     def _handle_list_services(self, slots: dict) -> bool:
         """Handle list services command."""
+        if self.service_manager is None:
+            self.assistant.speak("Service manager not available")
+            return False
         try:
             state_filter = slots.get('state')  # e.g., 'running', 'stopped'
             
@@ -196,6 +211,9 @@ class ServiceSkill(BaseSkill):
     
     def _handle_set_service_start_type(self, slots: dict) -> bool:
         """Handle set service start type command."""
+        if self.service_manager is None:
+            self.assistant.speak("Service manager not available")
+            return False
         if not self.assistant.has_permission('configure_service'):
             return False
         
@@ -230,6 +248,9 @@ class ServiceSkill(BaseSkill):
     
     def _handle_get_service_dependencies(self, slots: dict) -> bool:
         """Handle get service dependencies command."""
+        if self.service_manager is None:
+            self.assistant.speak("Service manager not available")
+            return False
         try:
             service_name = slots.get('service_name')
             if not service_name:
@@ -253,6 +274,9 @@ class ServiceSkill(BaseSkill):
     
     def _handle_configure_service_recovery(self, slots: dict) -> bool:
         """Handle configure service recovery command."""
+        if self.service_manager is None:
+            self.assistant.speak("Service manager not available")
+            return False
         if not self.assistant.has_permission('configure_service'):
             return False
         
@@ -282,4 +306,3 @@ class ServiceSkill(BaseSkill):
             logging.exception("Failed to configure service recovery")
             self.assistant.speak("Failed to configure service recovery")
             return False
-

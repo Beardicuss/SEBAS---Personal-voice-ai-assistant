@@ -2,19 +2,19 @@
 import logging
 import os
 import threading
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Callable
 import time
 
 import requests
 import json
 
 try:
-    import websocket
+    import websocket  # from websocket-client package
     WEBSOCKET_AVAILABLE = True
 except ImportError:
     websocket = None
     WEBSOCKET_AVAILABLE = False
-    logging.warning("websocket not available, real-time updates disabled")
+    logging.warning("websocket-client not installed — real-time updates disabled.")
 
 
 class HomeAssistantClient:
@@ -26,7 +26,7 @@ class HomeAssistantClient:
     def __init__(self, base_url: Optional[str] = None, token: Optional[str] = None):
         self.base_url = base_url or os.environ.get("HA_BASE_URL")
         self.token = token or os.environ.get("HA_TOKEN")
-        self.cache = {}  # Entity state cache
+        self.cache: Dict[str, Dict[str, Any]] = {}  # Entity state cache
         self.cache_lock = threading.Lock()
         self.ws = None
         self.ws_thread = None
@@ -38,7 +38,7 @@ class HomeAssistantClient:
     def _headers(self):
         return {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
 
-    def _call_service(self, domain: str, service: str, data: dict) -> bool:
+    def _call_service(self, domain: str, service: str, data: Dict[str, Any]) -> bool:
         if not self.available():
             logging.warning("HomeAssistantClient not configured")
             return False
@@ -93,13 +93,13 @@ class HomeAssistantClient:
 
     def set_light(self, entity_id: str, turn_on: bool, brightness: Optional[int] = None,
                   color_temp: Optional[int] = None, rgb_color: Optional[List[int]] = None) -> bool:
-        data = {"entity_id": entity_id}
+        data: Dict[str, Any] = {"entity_id": entity_id}
         if turn_on:
-            if brightness:
+            if brightness is not None:
                 data["brightness"] = brightness
-            if color_temp:
+            if color_temp is not None:
                 data["color_temp"] = color_temp
-            if rgb_color:
+            if rgb_color is not None:
                 data["rgb_color"] = rgb_color
             return self._call_service("light", "turn_on", data)
         else:
@@ -107,12 +107,13 @@ class HomeAssistantClient:
 
     def set_climate(self, entity_id: str, temperature: Optional[float] = None,
                     hvac_mode: Optional[str] = None) -> bool:
-        data = {"entity_id": entity_id}
-        if temperature:
+        data: Dict[str, Any] = {"entity_id": entity_id}
+        if temperature is not None:
             data["temperature"] = temperature
-        if hvac_mode:
+        if hvac_mode is not None:
             data["hvac_mode"] = hvac_mode
-        return self._call_service("climate", "set_temperature" if temperature else "set_hvac_mode", data)
+        service = "set_temperature" if temperature is not None else "set_hvac_mode"
+        return self._call_service("climate", service, data)
 
     def control_media_player(self, entity_id: str, action: str, **kwargs) -> bool:
         service_map = {
@@ -128,7 +129,7 @@ class HomeAssistantClient:
         service = service_map.get(action)
         if not service:
             return False
-        data = {"entity_id": entity_id}
+        data: Dict[str, Any] = {"entity_id": entity_id}
         if action == "set_volume" and "volume_level" in kwargs:
             data["volume_level"] = kwargs["volume_level"]
         return self._call_service("media_player", service, data)
@@ -169,7 +170,9 @@ class HomeAssistantClient:
 
     # WebSocket for real-time updates
     def connect_websocket(self):
-        if not self.available() or not WEBSOCKET_AVAILABLE:
+        if not self.available() or not WEBSOCKET_AVAILABLE or websocket is None:
+            return
+        if self.base_url is None:
             return
         ws_url = self.base_url.replace("http", "ws") + "/api/websocket"
         def on_message(ws, message):
@@ -185,16 +188,15 @@ class HomeAssistantClient:
             ws.send(json.dumps({"type": "auth", "access_token": self.token}))
             ws.send(json.dumps({"id": 1, "type": "subscribe_events", "event_type": "state_changed"}))
 
-        self.ws = websocket.WebSocketApp(ws_url, on_message=on_message, on_open=on_open)
-        self.ws_thread = threading.Thread(target=self.ws.run_forever)
-        self.ws_thread.daemon = True
-        self.ws_thread.start()
+        if WEBSOCKET_AVAILABLE and websocket is not None:
+            self.ws = websocket.WebSocketApp(ws_url, on_message=on_message, on_open=on_open)
+            self.ws_thread = threading.Thread(target=self.ws.run_forever)
+            self.ws_thread.daemon = True
+            self.ws_thread.start()
 
-    def add_listener(self, callback):
+    def add_listener(self, callback: Callable):
         self.listeners.append(callback)
 
 
 # Legacy alias for backward compatibility
 SmartHomeClient = HomeAssistantClient
-
-

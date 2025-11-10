@@ -12,9 +12,7 @@ import logging
 
 
 class SkillRegistry:
-    """
-    Manages the loading, registration, and execution of skills.
-    """
+    """Manages the loading, registration, and execution of skills."""
 
     def __init__(self, assistant_ref, skills_dir: str = "skills"):
         """
@@ -31,14 +29,11 @@ class SkillRegistry:
         self._load_skills()
 
     def _load_skills(self):
-        """
-        Load all skills from the skills directory.
-        """
+        """Load all skills from the skills directory."""
         if not os.path.exists(self.skills_dir):
             self.logger.warning(f"Skills directory '{self.skills_dir}' does not exist")
             return
 
-        # Load built-in skills first
         builtin_skills = [
             'skills.system_skill',
             'skills.app_skill',
@@ -68,10 +63,10 @@ class SkillRegistry:
             except Exception as e:
                 self.logger.error(f"Failed to load skill {module_name}: {e}")
 
-        # Load any additional skill files
+        # Load any extra files from the folder
         for filename in os.listdir(self.skills_dir):
             if filename.endswith('_skill.py') and filename != 'base_skill.py':
-                module_name = f"skills.{filename[:-3]}"  # Remove .py
+                module_name = f"skills.{filename[:-3]}"
                 if module_name not in builtin_skills:
                     try:
                         self._load_skill_module(module_name)
@@ -79,34 +74,24 @@ class SkillRegistry:
                         self.logger.error(f"Failed to load skill {module_name}: {e}")
 
     def _load_skill_module(self, module_name: str):
-        """
-        Load a skill module and instantiate its skill class.
-
-        Args:
-            module_name: Name of the module to load (e.g., 'skills.system_skill')
-        """
+        """Load a skill module and instantiate its class."""
         try:
-            # Import the module
             spec = importlib.util.find_spec(module_name)
-            if spec is None:
-                raise ImportError(f"Module {module_name} not found")
+            if spec is None or spec.loader is None:
+                raise ImportError(f"Failed to load module spec for {module_name}")
 
             module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            spec.loader.exec_module(module)  # type: ignore[union-attr]
 
-            # Find the skill class (subclass of BaseSkill)
             skill_class = None
             for name, obj in inspect.getmembers(module):
-                if (inspect.isclass(obj) and
-                    issubclass(obj, BaseSkill) and
-                    obj != BaseSkill):
+                if inspect.isclass(obj) and issubclass(obj, BaseSkill) and obj is not BaseSkill:
                     skill_class = obj
                     break
 
             if skill_class is None:
                 raise ValueError(f"No BaseSkill subclass found in {module_name}")
 
-            # Instantiate the skill
             skill_instance = skill_class(self.assistant)
             self.skills.append(skill_instance)
             self.logger.info(f"Loaded skill: {skill_class.__name__}")
@@ -116,31 +101,14 @@ class SkillRegistry:
             raise
 
     def get_skill_for_intent(self, intent: str) -> Optional[BaseSkill]:
-        """
-        Find a skill that can handle the given intent.
-
-        Args:
-            intent: The intent to find a skill for
-
-        Returns:
-            BaseSkill or None: The skill that can handle the intent, or None
-        """
+        """Find a skill that can handle the given intent."""
         for skill in self.skills:
             if skill.is_enabled() and skill.can_handle(intent):
                 return skill
         return None
 
     def handle_intent(self, intent: str, slots: Dict[str, Any]) -> bool:
-        """
-        Handle an intent using the appropriate skill.
-
-        Args:
-            intent: The intent to handle
-            slots: Slot values for the intent
-
-        Returns:
-            bool: True if a skill handled the intent successfully
-        """
+        """Handle an intent using the appropriate skill."""
         skill = self.get_skill_for_intent(intent)
         if skill:
             try:
@@ -151,12 +119,7 @@ class SkillRegistry:
         return False
 
     def get_all_intents(self) -> List[str]:
-        """
-        Get all intents supported by enabled skills.
-
-        Returns:
-            List[str]: List of all supported intents
-        """
+        """Get all intents supported by enabled skills."""
         intents = []
         for skill in self.skills:
             if skill.is_enabled():
@@ -164,50 +127,30 @@ class SkillRegistry:
         return intents
 
     def get_enabled_skills(self) -> List[BaseSkill]:
-        """
-        Get all enabled skills.
-
-        Returns:
-            List[BaseSkill]: List of enabled skills
-        """
+        """Get all enabled skills."""
         return [skill for skill in self.skills if skill.is_enabled()]
 
     def enable_skill(self, skill_name: str, enabled: bool = True):
-        """
-        Enable or disable a skill by name.
-
-        Args:
-            skill_name: Name of the skill class
-            enabled: Whether to enable the skill
-        """
+        """Enable or disable a skill by name."""
         for skill in self.skills:
             if skill.__class__.__name__ == skill_name:
                 skill.set_enabled(enabled)
-                # Save to preferences
                 if hasattr(self.assistant, 'prefs'):
                     pref_key = f"skill_{skill_name.lower()}_enabled"
                     self.assistant.prefs.set_pref(pref_key, enabled)
                 break
 
     def load_skill_preferences(self):
-        """
-        Load skill enable/disable preferences.
-        """
+        """Load skill enable/disable preferences."""
         if not hasattr(self.assistant, 'prefs'):
             return
-
         for skill in self.skills:
             pref_key = f"skill_{skill.__class__.__name__.lower()}_enabled"
             enabled = self.assistant.prefs.get_pref(pref_key, True)
             skill.set_enabled(enabled)
 
     def get_skill_info(self) -> Dict[str, Any]:
-        """
-        Get information about all loaded skills.
-
-        Returns:
-            Dict[str, Any]: Dictionary with skill information
-        """
+        """Return info about all loaded skills."""
         info = {}
         for skill in self.skills:
             info[skill.__class__.__name__] = {

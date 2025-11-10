@@ -179,4 +179,3 @@ class VoiceEngineManager:
         eng = self.current_engine
         return eng.get_available_languages() if eng else ["en"]
 
-

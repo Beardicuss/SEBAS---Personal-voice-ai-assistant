@@ -10,6 +10,7 @@ import os
 import psutil
 import logging
 import time
+from typing import Optional
 from .base_skill import BaseSkill
 
 class MonitoringSkill(BaseSkill):
@@ -65,7 +66,11 @@ class MonitoringSkill(BaseSkill):
             self.analyze_startup_impact()
             return True
         if intent == 'disable_startup_item':
-            self.disable_startup_item(slots.get('item_name'))
+            item_name = slots.get('item_name')
+            if item_name is None:
+                self.assistant.speak("Please specify which startup log item to disable.")
+                return False
+            self.disable_startup_item(item_name)
             return True
         return False
 
@@ -101,9 +106,12 @@ class MonitoringSkill(BaseSkill):
         """Reports on disk I/O."""
         try:
             io = psutil.disk_io_counters()
-            read_mb = io.read_bytes / (1024 * 1024)
-            write_mb = io.write_bytes / (1024 * 1024)
-            self.assistant.speak(f"Disk activity since boot: {read_mb:.1f} megabytes read, and {write_mb:.1f} megabytes written.")
+            if io is not None:
+                read_mb = io.read_bytes / (1024 * 1024)
+                write_mb = io.write_bytes / (1024 * 1024)
+                self.assistant.speak(f"Disk activity since boot: {read_mb:.1f} megabytes read, and {write_mb:.1f} megabytes written.")
+            else:
+                self.assistant.speak("I was unable to retrieve disk activity.")
         except Exception:
             logging.exception("Failed to get disk I/O.")
             self.assistant.speak("I was unable to retrieve disk activity.")
@@ -111,11 +119,12 @@ class MonitoringSkill(BaseSkill):
     def get_temperatures(self):
         """Reports on hardware temperatures."""
         try:
-            if not hasattr(psutil, "sensors_temperatures"):
+            sensors_temps = getattr(psutil, 'sensors_temperatures', None)
+            if not sensors_temps:
                 self.assistant.speak("I'm sorry, I cannot read temperature sensors on this system.")
                 return
 
-            temps = psutil.sensors_temperatures()
+            temps = sensors_temps()
             if not temps:
                 self.assistant.speak("No temperature sensors were found.")
                 return
@@ -227,7 +236,7 @@ class MonitoringSkill(BaseSkill):
         self.assistant.speak(f"I found {len(item_names)} startup items. Some of them are: {', '.join(spoken_items)}.")
         self.assistant.speak("You can ask me to disable any of them by name.")
 
-    def disable_startup_item(self, item_name: str):
+    def disable_startup_item(self, item_name: Optional[str]):
         """Disables a specific startup item."""
         if not item_name:
             self.assistant.speak("Please specify which startup item to disable.")

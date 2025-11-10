@@ -19,7 +19,7 @@ except ImportError:
     JWT_AVAILABLE = False
     logging.warning("PyJWT not available. JWT authentication will be disabled.")
 
-from constants.permissions import Role
+from sebas.constants.permissions import Role
 
 class AuthManager:
     """

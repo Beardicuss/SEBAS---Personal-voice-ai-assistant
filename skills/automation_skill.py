@@ -8,13 +8,55 @@ from skills.base_skill import BaseSkill
 from typing import Dict, Any
 import logging
 import platform
+from datetime import datetime, timedelta
+from integrations.email_client import EmailClient, fetch_email_summaries
+client = EmailClient()
+print(client.send_mail("me@domain.com", "Test", "Hello"))
+print(fetch_email_summaries(2))
+from integrations.ms_graph_auth import get_access_token
+print(get_access_token())
+from integrations.enterprise_integrations import JiraIntegration, DocumentationGenerator
+
+jira = JiraIntegration("https://fake.atlassian.net", "user", "token")
+ok, resp = jira.create_ticket("Test", "This is a test")
+print(ok, resp)
+
+docs = DocumentationGenerator().generate_configuration_documentation({"debug": True, "version": "1.0"})
+print(docs[:200])
+from integrations.event_system import EventSystem, EventType
+
+sys = EventSystem()
+
+def printer(event): 
+    print(f"[EVENT] {event.event_type.value} from {event.source}")
+
+sys.subscribe(EventType.CUSTOM, printer)
+sys.publish_event(EventType.CUSTOM, "TestModule", {"hello": "world"})
+
+from integrations.firewall_manager import FirewallManager, FirewallRuleDirection, FirewallRuleAction, FirewallRuleProtocol
+
+fw = FirewallManager()
+ok, msg = fw.create_firewall_rule("TestRule", FirewallRuleDirection.INBOUND, FirewallRuleAction.ALLOW, FirewallRuleProtocol.TCP, local_port=8080)
+print(ok, msg)
+ok, rules = fw.list_firewall_rules("TestRule")
+print(rules)
+fw.delete_firewall_rule("TestRule")
+
+from integrations.file_operations import FileOperations
+f = FileOperations()
+ok, stats = f.copy_recursive("C:/temp/source", "C:/temp/dest", pattern="*.txt", overwrite=True)
+print(ok, stats)
+dupes = f.find_duplicate_files("C:/temp")
+print("Duplicates:", dupes)
+
+
 
 
 class AutomationSkill(BaseSkill):
     """
     Skill for managing automation workflows and scripts.
     """
-    
+
     def __init__(self, assistant):
         super().__init__(assistant)
         self.intents = [
@@ -43,7 +85,7 @@ class AutomationSkill(BaseSkill):
         self.script_executor = None
         self.task_scheduler = None
         self._init_managers()
-    
+
     def _init_managers(self):
         """Initialize automation managers."""
         try:
@@ -58,13 +100,13 @@ class AutomationSkill(BaseSkill):
             self.automation_engine = None
             self.script_executor = None
             self.task_scheduler = None
-    
+
     def can_handle(self, intent: str) -> bool:
         return intent in self.get_intents()
-    
+
     def get_intents(self) -> list:
         return self.intents
-    
+
     def handle(self, intent: str, slots: dict) -> bool:
         if intent == 'create_workflow':
             return self._handle_create_workflow(slots)
@@ -107,310 +149,310 @@ class AutomationSkill(BaseSkill):
         elif intent == 'delete_calendar_event':
             return self._handle_delete_calendar_event(slots)
         return False
-    
+
     def _handle_create_workflow(self, slots: dict) -> bool:
         """Handle create workflow command."""
         if not self.assistant.has_permission('create_workflow'):
             return False
-        
+
         try:
             if not self.automation_engine:
                 self.assistant.speak("Automation engine not available")
                 return False
-            
+
             workflow_name = slots.get('name')
             if not workflow_name:
                 self.assistant.speak("Please specify a workflow name")
                 return False
-            
-            workflow = self.automation_engine.create_workflow(workflow_name)
+
+            self.automation_engine.create_workflow(workflow_name)
             self.assistant.speak(f"Workflow {workflow_name} created")
             return True
-            
+
         except Exception:
             logging.exception("Failed to create workflow")
             self.assistant.speak("Failed to create workflow")
             return False
-    
+
     def _handle_execute_workflow(self, slots: dict) -> bool:
         """Handle execute workflow command."""
         if not self.assistant.has_permission('execute_workflow'):
             return False
-        
+
         try:
             if not self.automation_engine:
                 self.assistant.speak("Automation engine not available")
                 return False
-            
+
             workflow_name = slots.get('name')
             if not workflow_name:
                 self.assistant.speak("Please specify a workflow name")
                 return False
-            
+
             workflow = self.automation_engine.execute_workflow(workflow_name)
-            
+
             if workflow:
                 status = workflow.status.value
                 self.assistant.speak(f"Workflow {workflow_name} executed with status: {status}")
             else:
                 self.assistant.speak(f"Workflow {workflow_name} not found")
-            
+
             return workflow is not None
-            
+
         except Exception:
             logging.exception("Failed to execute workflow")
             self.assistant.speak("Failed to execute workflow")
             return False
-    
+
     def _handle_list_workflows(self) -> bool:
         """Handle list workflows command."""
         try:
             if not self.automation_engine:
                 self.assistant.speak("Automation engine not available")
                 return False
-            
+
             workflows = self.automation_engine.list_workflows()
-            
+
             if workflows:
                 self.assistant.speak(f"Found {len(workflows)} workflows: {', '.join(workflows[:10])}")
             else:
                 self.assistant.speak("No workflows found")
-            
+
             return True
-            
+
         except Exception:
             logging.exception("Failed to list workflows")
             self.assistant.speak("Failed to list workflows")
             return False
-    
+
     def _handle_delete_workflow(self, slots: dict) -> bool:
         """Handle delete workflow command."""
         if not self.assistant.has_permission('delete_workflow'):
             return False
-        
+
         try:
             if not self.automation_engine:
                 self.assistant.speak("Automation engine not available")
                 return False
-            
+
             workflow_name = slots.get('name')
             if not workflow_name:
                 self.assistant.speak("Please specify a workflow name")
                 return False
-            
+
             success = self.automation_engine.delete_workflow(workflow_name)
-            
+
             if success:
                 self.assistant.speak(f"Workflow {workflow_name} deleted")
             else:
                 self.assistant.speak(f"Workflow {workflow_name} not found")
-            
+
             return success
-            
+
         except Exception:
             logging.exception("Failed to delete workflow")
             self.assistant.speak("Failed to delete workflow")
             return False
-    
+
     def _handle_execute_powershell(self, slots: dict) -> bool:
         """Handle execute PowerShell command."""
         if not self.assistant.has_permission('execute_powershell'):
             return False
-        
+
         try:
             if not self.script_executor:
                 self.assistant.speak("Script executor not available")
                 return False
-            
+
             script = slots.get('script')
             if not script:
                 self.assistant.speak("Please specify a PowerShell script")
                 return False
-            
+
             success, stdout, stderr = self.script_executor.execute_powershell(script)
-            
+
             if success:
                 self.assistant.speak("PowerShell script executed successfully")
             else:
                 self.assistant.speak(f"Script execution failed: {stderr[:100]}")
-            
+
             return success
-            
+
         except Exception:
             logging.exception("Failed to execute PowerShell")
             self.assistant.speak("Failed to execute PowerShell script")
             return False
-    
+
     def _handle_execute_batch(self, slots: dict) -> bool:
         """Handle execute batch command."""
         if not self.assistant.has_permission('execute_batch'):
             return False
-        
+
         try:
             if not self.script_executor:
                 self.assistant.speak("Script executor not available")
                 return False
-            
+
             script = slots.get('script')
             if not script:
                 self.assistant.speak("Please specify a batch script")
                 return False
-            
+
             success, stdout, stderr = self.script_executor.execute_batch(script)
-            
+
             if success:
                 self.assistant.speak("Batch script executed successfully")
             else:
                 self.assistant.speak(f"Script execution failed: {stderr[:100]}")
-            
+
             return success
-            
+
         except Exception:
             logging.exception("Failed to execute batch")
             self.assistant.speak("Failed to execute batch script")
             return False
-    
+
     def _handle_execute_python(self, slots: dict) -> bool:
         """Handle execute Python command."""
         if not self.assistant.has_permission('execute_python'):
             return False
-        
+
         try:
             if not self.script_executor:
                 self.assistant.speak("Script executor not available")
                 return False
-            
+
             script = slots.get('script')
             if not script:
                 self.assistant.speak("Please specify a Python script")
                 return False
-            
+
             success, stdout, stderr = self.script_executor.execute_python(script)
-            
+
             if success:
                 self.assistant.speak("Python script executed successfully")
             else:
                 self.assistant.speak(f"Script execution failed: {stderr[:100]}")
-            
+
             return success
-            
+
         except Exception:
             logging.exception("Failed to execute Python")
             self.assistant.speak("Failed to execute Python script")
             return False
-    
+
     def _handle_create_scheduled_task(self, slots: dict) -> bool:
         """Handle create scheduled task command."""
         if not self.assistant.has_permission('create_scheduled_task'):
             return False
-        
+
         try:
             if not self.task_scheduler:
                 self.assistant.speak("Task scheduler not available")
                 return False
-            
+
             task_name = slots.get('name')
             command = slots.get('command')
-            
+
             if not task_name or not command:
                 self.assistant.speak("Please specify task name and command")
                 return False
-            
+
             from integrations.task_scheduler import TaskTriggerType
             trigger_type = TaskTriggerType.DAILY  # Default
-            
+
             success, message = self.task_scheduler.create_task(
                 task_name=task_name,
                 command=command,
                 trigger_type=trigger_type
             )
-            
+
             if success:
                 self.assistant.speak(message)
             else:
                 self.assistant.speak(f"Failed to create task: {message}")
-            
+
             return success
-            
+
         except Exception:
             logging.exception("Failed to create scheduled task")
             self.assistant.speak("Failed to create scheduled task")
             return False
-    
+
     def _handle_list_scheduled_tasks(self) -> bool:
         """Handle list scheduled tasks command."""
         try:
             if not self.task_scheduler:
                 self.assistant.speak("Task scheduler not available")
                 return False
-            
+
             tasks = self.task_scheduler.list_tasks()
-            
+
             if tasks:
                 self.assistant.speak(f"Found {len(tasks)} scheduled tasks")
             else:
                 self.assistant.speak("No scheduled tasks found")
-            
+
             return True
-            
+
         except Exception:
             logging.exception("Failed to list scheduled tasks")
             self.assistant.speak("Failed to list scheduled tasks")
             return False
-    
+
     def _handle_run_scheduled_task(self, slots: dict) -> bool:
         """Handle run scheduled task command."""
         if not self.assistant.has_permission('run_scheduled_task'):
             return False
-        
+
         try:
             if not self.task_scheduler:
                 self.assistant.speak("Task scheduler not available")
                 return False
-            
+
             task_name = slots.get('name')
             if not task_name:
                 self.assistant.speak("Please specify a task name")
                 return False
-            
+
             success, message = self.task_scheduler.run_task(task_name)
-            
+
             if success:
                 self.assistant.speak(message)
             else:
                 self.assistant.speak(f"Failed to run task: {message}")
-            
+
             return success
-            
+
         except Exception:
             logging.exception("Failed to run scheduled task")
             self.assistant.speak("Failed to run scheduled task")
             return False
-    
+
     def _handle_delete_scheduled_task(self, slots: dict) -> bool:
         """Handle delete scheduled task command."""
         if not self.assistant.has_permission('delete_scheduled_task'):
             return False
-        
+
         try:
             if not self.task_scheduler:
                 self.assistant.speak("Task scheduler not available")
                 return False
-            
+
             task_name = slots.get('name')
             if not task_name:
                 self.assistant.speak("Please specify a task name")
                 return False
-            
+
             success, message = self.task_scheduler.delete_task(task_name)
-            
+
             if success:
                 self.assistant.speak(message)
             else:
                 self.assistant.speak(f"Failed to delete task: {message}")
-            
+
             return success
-            
+
         except Exception:
             logging.exception("Failed to delete scheduled task")
             self.assistant.speak("Failed to delete scheduled task")
@@ -439,6 +481,7 @@ class AutomationSkill(BaseSkill):
 
     def _schedule_reminder(self, when_ts: float, message: str, reminder_id: str):
         import threading, time
+
         def _timer():
             delay = max(0.0, when_ts - time.time())
             if delay:
@@ -447,6 +490,7 @@ class AutomationSkill(BaseSkill):
                 self.assistant.speak(f"Reminder: {message}")
             except Exception:
                 logging.exception("reminder speak failed")
+
         t = threading.Thread(target=_timer, daemon=True)
         t.start()
 
@@ -466,18 +510,19 @@ class AutomationSkill(BaseSkill):
                 when_ts = time.time() + delay
             else:
                 # parse when
-                import time, datetime
+                import time, datetime as dt_mod
                 try:
                     if isinstance(when, (int, float)):
                         when_ts = float(when)
                     else:
                         # try ISO
-                        dt = datetime.datetime.fromisoformat(str(when))
+                        dt = dt_mod.datetime.fromisoformat(str(when))
                         when_ts = dt.timestamp()
                 except Exception:
                     self.assistant.speak("I couldn't parse the time")
                     return False
-            import time, uuid
+
+            import uuid
             reminder_id = str(uuid.uuid4())[:8]
             items = self._load_reminders()
             items.append({"id": reminder_id, "when": when_ts, "message": message})
@@ -502,7 +547,7 @@ class AutomationSkill(BaseSkill):
             if not upcoming:
                 self.assistant.speak("No upcoming reminders")
                 return True
-            from datetime import datetime
+
             summary = []
             for it in upcoming[:5]:
                 ts = it.get('when', 0)
@@ -613,7 +658,6 @@ class AutomationSkill(BaseSkill):
         """
         try:
             import re
-            from datetime import datetime, timedelta
             now = datetime.now()
 
             txt = text.lower().strip()
@@ -642,7 +686,6 @@ class AutomationSkill(BaseSkill):
             m = re.search(r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b", txt_clean)
             if m:
                 y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
-                from datetime import datetime
                 date_dt = datetime(y, mo, d)
                 txt_clean = txt_clean.replace(m.group(0), '').strip()
             else:
@@ -653,22 +696,25 @@ class AutomationSkill(BaseSkill):
                     y = int(m.group(3)) if m.group(3) else now.year
                     if y < 100:
                         y += 2000
-                    from datetime import datetime
                     date_dt = datetime(y, mo, d)
                     txt_clean = txt_clean.replace(m.group(0), '').strip()
                 else:
                     # Month name forms (Nov 12, 2025)
                     months = {
-                        'january':1,'february':2,'march':3,'april':4,'may':5,'june':6,
-                        'july':7,'august':8,'september':9,'october':10,'november':11,'december':12,
-                        'jan':1,'feb':2,'mar':3,'apr':4,'jun':6,'jul':7,'aug':8,'sep':9,'sept':9,'oct':10,'nov':11,'dec':12
+                        'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+                        'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
+                        'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'sept': 9,
+                        'oct': 10, 'nov': 11, 'dec': 12
                     }
-                    m = re.search(r"\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:,\s*(\d{4}))?\b", txt_clean)
+                    m = re.search(
+                        r"\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|"
+                        r"sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:,\s*(\d{4}))?\b",
+                        txt_clean
+                    )
                     if m:
                         mo = months[m.group(1)]
                         d = int(m.group(2))
                         y = int(m.group(3)) if m.group(3) else now.year
-                        from datetime import datetime
                         date_dt = datetime(y, mo, d)
                         txt_clean = txt_clean.replace(m.group(0), '').strip()
 
@@ -677,7 +723,6 @@ class AutomationSkill(BaseSkill):
 
             # 2) "next week" handling (optionally with weekday)
             if 'next week' in txt_clean:
-                from datetime import timedelta
                 # Move to next week's Monday
                 days_to_monday = (7 - now.weekday()) % 7
                 if days_to_monday == 0:
@@ -695,6 +740,7 @@ class AutomationSkill(BaseSkill):
                 else:
                     start_day = base_next_monday + timedelta(days=found_wd)
                 txt_clean = txt_clean.replace('next week', '').strip()
+
             if 'tomorrow' in txt_clean:
                 start_day = now + timedelta(days=1)
                 txt_clean = txt_clean.replace('tomorrow', '').strip()
@@ -776,11 +822,13 @@ class AutomationSkill(BaseSkill):
             if not items:
                 self.assistant.speak("No events found in that window")
                 return True
+
             # Summarize titles and times for first few
             def _fmt(it):
                 s = it.get('start', {}).get('dateTime') or ''
                 t = it.get('subject') or 'Untitled'
                 return f"{t} at {s}"
+
             summary = ", ".join(_fmt(it) for it in items[:min(5, len(items))])
             self.assistant.speak(f"Events: {summary}")
             return True
@@ -826,4 +874,3 @@ class AutomationSkill(BaseSkill):
             logging.exception("delete_calendar_event failed")
             self.assistant.speak("Failed to delete calendar event")
             return False
-

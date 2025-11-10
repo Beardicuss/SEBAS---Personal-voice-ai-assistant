@@ -236,4 +236,3 @@ class AIAnalyticsSkill(BaseSkill):
             logging.exception("Failed to diagnose issue")
             self.assistant.speak("Failed to diagnose issue")
             return False
-

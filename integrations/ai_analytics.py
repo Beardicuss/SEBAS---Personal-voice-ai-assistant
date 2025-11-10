@@ -460,4 +460,3 @@ class TroubleshootingGuide:
         matches.sort(key=lambda x: x['confidence'], reverse=True)
         
         return matches
-

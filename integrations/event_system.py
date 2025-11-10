@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
 """
 Event-Driven Automation System
-Phase 5.1: Event-driven automation triggers
+Phase 5.1: Event-driven automation triggers (improved version)
 """
 
 import logging
 import threading
+import json
 from typing import Dict, List, Callable, Optional, Any
 from datetime import datetime
 from enum import Enum
-import json
 
 
 class EventType(Enum):
-    """Event types"""
+    """Supported event types."""
     FILE_CREATED = "file_created"
     FILE_MODIFIED = "file_modified"
     FILE_DELETED = "file_deleted"
@@ -27,109 +27,92 @@ class EventType(Enum):
 
 
 class Event:
-    """Represents an event."""
-    
+    """Represents a single event instance."""
+
     def __init__(self, event_type: EventType, source: str, data: Optional[Dict] = None):
-        """
-        Initialize event.
-        
-        Args:
-            event_type: Type of event
-            source: Event source
-            data: Event data
-        """
         self.event_type = event_type
         self.source = source
         self.data = data or {}
         self.timestamp = datetime.now()
         self.id = f"{event_type.value}_{self.timestamp.timestamp()}"
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "type": self.event_type.value,
+            "source": self.source,
+            "timestamp": self.timestamp.isoformat(),
+            "data": self.data,
+        }
+
 
 class EventSystem:
-    """
-    Event-driven automation system for triggers and subscriptions.
-    """
-    
+    """Thread-safe event-driven automation system."""
+
     def __init__(self):
-        """Initialize Event System."""
-        self.subscribers: Dict[EventType, List[Callable]] = {}
+        self.subscribers: Dict[EventType, List[Callable[[Event], None]]] = {}
         self.event_history: List[Event] = []
         self.lock = threading.Lock()
         self.max_history = 1000
-    
-    def subscribe(self, event_type: EventType, handler: Callable):
-        """
-        Subscribe to an event type.
-        
-        Args:
-            event_type: Type of event to subscribe to
-            handler: Handler function that takes (event: Event) as parameter
-        """
+
+    def subscribe(self, event_type: EventType, handler: Callable[[Event], None]):
+        """Subscribe a handler to an event type."""
         with self.lock:
-            if event_type not in self.subscribers:
-                self.subscribers[event_type] = []
-            self.subscribers[event_type].append(handler)
-            logging.info(f"Subscribed to {event_type.value}")
-    
-    def unsubscribe(self, event_type: EventType, handler: Callable):
-        """Unsubscribe from an event type."""
+            self.subscribers.setdefault(event_type, []).append(handler)
+            logging.info(f"[EventSystem] Subscribed to {event_type.value}: {handler}")
+
+    def unsubscribe(self, event_type: EventType, handler: Callable[[Event], None]):
+        """Unsubscribe a handler from an event type."""
         with self.lock:
-            if event_type in self.subscribers:
-                if handler in self.subscribers[event_type]:
-                    self.subscribers[event_type].remove(handler)
-                    logging.info(f"Unsubscribed from {event_type.value}")
-    
+            handlers = self.subscribers.get(event_type)
+            if handlers and handler in handlers:
+                handlers.remove(handler)
+                logging.info(f"[EventSystem] Unsubscribed from {event_type.value}: {handler}")
+
     def publish(self, event: Event):
-        """
-        Publish an event to all subscribers.
-        
-        Args:
-            event: Event to publish
-        """
-        # Add to history
+        """Publish an event to all subscribers."""
         with self.lock:
             self.event_history.append(event)
             if len(self.event_history) > self.max_history:
                 self.event_history.pop(0)
-        
-        # Notify subscribers
-        handlers = []
-        with self.lock:
-            handlers = self.subscribers.get(event.event_type, []).copy()
-        
+            handlers = list(self.subscribers.get(event.event_type, []))
+
+        # Notify subscribers asynchronously
         for handler in handlers:
-            try:
-                handler(event)
-            except Exception:
-                logging.exception(f"Error in event handler for {event.event_type.value}")
-    
+            def _safe_call(h=handler):
+                try:
+                    h(event)
+                except Exception:
+                    logging.exception(f"[EventSystem] Error in handler {h} for {event.event_type.value}")
+            t = threading.Thread(target=_safe_call, daemon=True)
+            t.start()
+
     def publish_event(self, event_type: EventType, source: str, data: Optional[Dict] = None):
-        """Convenience method to publish an event."""
+        """Convenience wrapper to create and publish an event."""
         event = Event(event_type, source, data)
         self.publish(event)
-    
-    def get_event_history(self, event_type: Optional[EventType] = None,
-                         limit: int = 100) -> List[Event]:
-        """
-        Get event history.
-        
-        Args:
-            event_type: Optional filter by event type
-            limit: Maximum number of events to return
-            
-        Returns:
-            List of events
-        """
+
+    def get_event_history(self, event_type: Optional[EventType] = None, limit: int = 100) -> List[Event]:
+        """Return the most recent events, optionally filtered by type."""
         with self.lock:
-            events = self.event_history.copy()
-        
+            events = list(self.event_history)
         if event_type:
             events = [e for e in events if e.event_type == event_type]
-        
         return events[-limit:]
-    
+
+    def export_history_json(self, path: str):
+        """Export event history to a JSON file."""
+        with self.lock:
+            data = [e.to_dict() for e in self.event_history]
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            logging.info(f"[EventSystem] Event history exported to {path}")
+        except Exception:
+            logging.exception("[EventSystem] Failed to export event history")
+
     def clear_history(self):
-        """Clear event history."""
+        """Clear stored event history."""
         with self.lock:
             self.event_history.clear()
-
+            logging.info("[EventSystem] Cleared event history")

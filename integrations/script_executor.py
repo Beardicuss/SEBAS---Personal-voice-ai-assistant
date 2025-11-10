@@ -241,4 +241,3 @@ class ScriptExecutor:
         except Exception:
             logging.exception("Failed to execute command")
             return False, "", "Failed to execute command"
-

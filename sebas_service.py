@@ -12,7 +12,7 @@ To install/manage the service from an ADMINISTRATOR command prompt:
 > python sebas_service.py stop
 > python sebas_service.py remove
 
-The service logs to D:\sebas_service.log
+The service logs to D:\\sebas_service.log
 """
 import socket
 import json
@@ -24,11 +24,14 @@ import shutil
 import ctypes
 import winreg
 import psutil
-
+import win32evtlog  # For audit events
+import win32evtlogutil  # For formatting event messages
 import win32serviceutil
 import win32service
 import win32event
 import servicemanager
+from datetime import datetime
+from typing import Dict, Any  # Added to resolve undefined type hints
 
 HOST = '127.0.0.1'
 PORT = 5001  # Port for the service to listen on
@@ -172,6 +175,10 @@ class SebasService(win32serviceutil.ServiceFramework):
                 if not item: raise ValueError("No startup item provided")
                 self._disable_startup_item(item)
                 result = {"status": "ok", "message": f"Disabled startup item {item.get('name')}"}
+            elif command == 'get_audit_events':
+                result = self._get_audit_events(params)
+            elif command == 'verify_security_policy':
+                result = self._verify_security_policy()
             # Add other privileged commands here...
             else:
                 result = {"status": "error", "message": "Unknown command"}
@@ -181,6 +188,130 @@ class SebasService(win32serviceutil.ServiceFramework):
             result = {"status": "error", "message": str(e)}
 
         return json.dumps(result)
+
+    def _get_audit_events(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            hand = win32evtlog.OpenEventLog(None, 'Security')
+            flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
+            events = []
+            offset = 0
+            limit = params.get('limit', 50)
+            start_date_str = params.get('start_date')
+            start_date = datetime.fromisoformat(start_date_str) if start_date_str else None
+            event_type = params.get('event_type')  # String for EventID match
+            category = params.get('category')  # Filter on EventCategory
+            severity = params.get('severity')  # Not directly supported; approximate with EventType
+
+            total_read = 0
+            while True:
+                evts = win32evtlog.ReadEventLog(hand, flags, offset, 1024 * 64)  # Buffer size
+                if not evts:
+                    break
+                for evt in evts:
+                    total_read += 1
+                    # Explicit format string added to satisfy Pylance (matches expected output for strptime)
+                    time_str = evt.TimeGenerated.Format('%m/%d/%y %H:%M:%S')
+                    evt_time = datetime.strptime(time_str, '%m/%d/%y %H:%M:%S')
+                    if start_date and evt_time < start_date:
+                        continue
+                    if event_type and str(evt.EventID) != event_type:
+                        continue
+                    if category and str(evt.EventCategory) != category:
+                        continue
+                    # Severity approximation (EventType: 1=Error, 2=Warning, 4=Info, 8=Success Audit, 16=Failure Audit)
+                    if severity:
+                        evt_type_map = {1: 'error', 2: 'warning', 4: 'info', 8: 'success', 16: 'failure'}
+                        if evt_type_map.get(evt.EventType, 'unknown') != severity.lower():
+                            continue
+
+                    event_dict = {
+                        'EventID': evt.EventID,
+                        'TimeGenerated': evt_time.isoformat(),
+                        'SourceName': evt.SourceName,
+                        'EventCategory': evt.EventCategory,
+                        'StringInserts': list(evt.StringInserts) if evt.StringInserts else [],
+                        'Message': win32evtlogutil.SafeFormatMessage(evt, 'Security')
+                    }
+                    events.append(event_dict)
+                    if len(events) >= limit:
+                        break
+                if len(events) >= limit:
+                    break
+                offset = total_read
+            win32evtlog.CloseEventLog(hand)
+            return {"status": "ok", "events": events}
+        except Exception as e:
+            logging.error(f"Failed to get audit events: {e}", exc_info=True)
+            return {"status": "error", "message": str(e)}
+
+    def _verify_security_policy(self) -> Dict[str, Any]:
+        try:
+            results = {
+                'compliance_status': 'Compliant',
+                'passed': 0,
+                'failed': 0,
+                'warnings': 0,
+                'details': []
+            }
+            # Example checks (expand as per roadmap; reuse from prior phases)
+            checks = [
+                ('UAC enabled', self._check_uac_enabled()),
+                ('Admin approval mode', self._check_admin_approval_mode()),
+                ('Credential Guard enabled', self._check_credential_guard()),
+                ('Firewall enabled', self._check_firewall_enabled()),
+                ('Secure Boot enabled', self._check_secure_boot())
+            ]
+            for name, passed in checks:
+                if passed:
+                    results['passed'] += 1
+                else:
+                    results['failed'] += 1
+                    results['compliance_status'] = 'Non-Compliant'
+                results['details'].append({'name': name, 'passed': passed})
+            return {"status": "ok", "results": results}
+        except Exception as e:
+            logging.error(f"Failed to verify security policy: {e}", exc_info=True)
+            return {"status": "error", "message": str(e)}
+
+    # Helper methods for policy checks (implement as needed; placeholders from prior)
+    def _check_uac_enabled(self):
+        try:
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System")
+            value, _ = winreg.QueryValueEx(key, "EnableLUA")
+            winreg.CloseKey(key)
+            return value == 1
+        except:
+            return False
+
+    def _check_admin_approval_mode(self):
+        try:
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System")
+            value, _ = winreg.QueryValueEx(key, "FilterAdministratorToken")
+            winreg.CloseKey(key)
+            return value == 1
+        except:
+            return False
+
+    def _check_credential_guard(self):
+        try:
+            output = subprocess.run(["powershell", "-Command", "Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\LSA' -Name 'LsaCfgFlags'"], capture_output=True, text=True)
+            return 'LsaCfgFlags : 1' in output.stdout or 'LsaCfgFlags : 2' in output.stdout
+        except:
+            return False
+
+    def _check_firewall_enabled(self):
+        try:
+            output = subprocess.run(["powershell", "-Command", "Get-NetFirewallProfile | Select Name, Enabled"], capture_output=True, text=True)
+            return all('Enabled : True' in line for line in output.stdout.splitlines() if 'Enabled' in line)
+        except:
+            return False
+
+    def _check_secure_boot(self):
+        try:
+            output = subprocess.run(["powershell", "-Command", "Confirm-SecureBootUEFI"], capture_output=True, text=True)
+            return 'True' in output.stdout
+        except:
+            return False
 
     def _clean_temp_folders(self):
         """Deletes files from common temporary folders."""
@@ -260,7 +391,12 @@ class SebasService(win32serviceutil.ServiceFramework):
         name = item.get('name')
         source = item.get('source')
 
+        if not name:
+            raise ValueError("No name provided for startup item")
+
         if location == 'registry':
+            if not source:
+                raise ValueError("No source provided for registry startup item")
             hive_str, path = source.split('\\', 1)
             hive_map = {str(winreg.HKEY_CURRENT_USER): winreg.HKEY_CURRENT_USER, str(winreg.HKEY_LOCAL_MACHINE): winreg.HKEY_LOCAL_MACHINE}
             hive = hive_map.get(hive_str)
@@ -271,6 +407,8 @@ class SebasService(win32serviceutil.ServiceFramework):
                 winreg.DeleteValue(key, name)
         
         elif location == 'folder':
+            if not source:
+                raise ValueError("No source provided for folder startup item")
             logging.info(f"Disabling folder startup item: {name} from {source}")
             disabled_folder = os.path.join(os.path.dirname(source), "Startup (Disabled)")
             os.makedirs(disabled_folder, exist_ok=True)

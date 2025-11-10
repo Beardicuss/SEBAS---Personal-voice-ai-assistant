@@ -251,4 +251,3 @@ class TaskScheduler:
         except Exception:
             logging.exception(f"Failed to disable task {task_name}")
             return False, "Failed to disable task"
-

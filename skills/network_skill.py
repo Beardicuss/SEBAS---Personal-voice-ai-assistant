@@ -733,4 +733,3 @@ class NetworkSkill(BaseSkill):
             logging.exception("Failed to list VPN connections")
             self.assistant.speak("Failed to list VPN connections")
             return False
-

@@ -1,5 +1,5 @@
-import os
-import sys
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import logging
 import traceback
 import threading
@@ -11,10 +11,8 @@ import platform
 import psutil
 import requests
 import webbrowser
-from datetime import datetime
+from datetime import datetime, timedelta
 import screen_brightness_control as sbc
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-from comtypes import CLSCTX_ALL
 from ctypes import cast, POINTER
 import ctypes
 import json
@@ -22,19 +20,20 @@ import re
 import winreg
 import webbrowser as _web
 import socket
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from services.voice_engine import VoiceEngineManager
 from services.language_manager import LanguageManager
 from constants.permissions import Role, get_permission_for_intent
 import pyaudio
-import json
 from comtypes import POINTER, cast
-from comtypes.client import GetModule
+from comtypes import CLSCTX_ALL, cast
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-from ctypes import POINTER as C_PTR
 from comtypes import CLSCTX_ALL
 from typing import Any
 from comtypes.client import GetBestInterface
+from PIL import ImageGrab
+from sebas.logging_config import setup_structured_logging, log_with_context, get_audit_logger
+
 
 # ----------------------- Profiles & Logging -----------------------
 # Profile-aware base directory for logs and preferences
@@ -44,14 +43,13 @@ try:
     os.makedirs(PROFILE_DIR, exist_ok=True)
 except Exception:
     pass
-
 # Try to use structured logging if available (Phase 1.5)
 try:
-    from logging_conf.logging_config import setup_structured_logging, get_audit_logger, LogContext
+    from .logging_config import setup_structured_logging
     LOG_PATH = os.path.join(PROFILE_DIR, "sebas.log")
     setup_structured_logging(
         log_file=LOG_PATH,
-        log_format='json',  # Use JSON format for structured logging
+        log_format='json', # Use JSON format for structured logging
         log_level='INFO',
         console_output=True,
         file_output=True
@@ -71,20 +69,19 @@ except ImportError:
     )
     AUDIT_LOGGER = None
     STRUCTURED_LOGGING = False
-    LogContext = None  # type: ignore
+    LogContext = None # type: ignore
+                            
 
-# ----------------------- Logging Dashboard (Flask) -----------------------
 try:
-	if str(os.environ.get('SEBAS_LOG_DASHBOARD', '0')).lower() in ('1', 'true', 'yes'):
-		from logging_conf.logging_dashboard import start_logging_dashboard
-		host = os.environ.get('SEBAS_LOG_DASHBOARD_HOST', '127.0.0.1')
-		port = int(os.environ.get('SEBAS_LOG_DASHBOARD_PORT', '5600'))
-		audit_path = os.path.join(os.path.dirname(LOG_PATH), 'sebas_audit.log')
-		start_logging_dashboard(host=host, port=port, log_file=LOG_PATH, audit_log_file=audit_path)
-		logging.info(f"Logging dashboard available at http://{host}:{port}")
+    if str(os.environ.get('SEBAS_LOG_DASHBOARD', '0')).lower() in ('1', 'true', 'yes'):
+        from logging_conf.logging_dashboard import start_logging_dashboard
+        host = os.environ.get('SEBAS_LOG_DASHBOARD_HOST', '127.0.0.1')
+        port = int(os.environ.get('SEBAS_LOG_DASHBOARD_PORT', '5600'))
+        audit_path = os.path.join(os.path.dirname(LOG_PATH), 'sebas_audit.log')
+        start_logging_dashboard(host=host, port=port, log_file=LOG_PATH, audit_log_file=audit_path)
+        logging.info(f"Logging dashboard available at http://{host}:{port}")
 except Exception:
-	logging.exception("Failed to start logging dashboard")
-
+    logging.exception("Failed to start logging dashboard")
 # ----------------------- Runtime Base Directory -----------------------
 # Ensure working directory is the app folder (supports PyInstaller _MEIPASS)
 try:
@@ -92,20 +89,16 @@ try:
     os.chdir(BASE_DIR)
 except Exception:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 def log_unhandled_exception(exc_type, exc_value, exc_tb):
     logging.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_tb))
     traceback.print_exception(exc_type, exc_value, exc_tb)
-
 sys.excepthook = log_unhandled_exception
-
 # ----------------------- Service Client -----------------------
 class ServiceClient:
     """Client to communicate with the privileged background service."""
     def __init__(self, host='127.0.0.1', port=5001):
         self.host = host
         self.port = port
-
     def send_command(self, command, params=None):
         """Sends a command to the service and returns the response."""
         if params is None:
@@ -118,7 +111,7 @@ class ServiceClient:
                 s.sendall(request.encode('utf-8'))
                 response_data = s.recv(8192)
                 response = json.loads(response_data.decode('utf-8'))
-                
+               
                 logging.info(f"Service response for '{command}': {response}")
                 if response.get('status') == 'ok':
                     return True, response
@@ -130,7 +123,6 @@ class ServiceClient:
         except Exception as e:
             logging.exception(f"Failed to communicate with service for command '{command}'")
             return False, str(e)
-
 # ----------------------- Utilities: Error Handling -----------------------
 def safe_call(log_message=None, speak_message=None):
     def _decorator(fn):
@@ -149,7 +141,6 @@ def safe_call(log_message=None, speak_message=None):
                             pass
         return _wrapped
     return _decorator
-
 # ----------------------- WakeWordDetector -----------------------
 class WakeWordDetector:
     """
@@ -167,30 +158,26 @@ class WakeWordDetector:
         self._audio_lock = audio_lock
         # Presence flag to avoid attribute errors; actual mic opened lazily
         self.microphone = True
-
     def start(self):
         if self._thread and self._thread.is_alive():
             return
         self._running_event.set()
         self._thread = threading.Thread(target=self._loop, daemon=True, name="WakeWord")
         self._thread.start()
-
     def stop(self, join=True, timeout=3.0):
         self._running_event.clear()
         if join and self._thread:
             self._thread.join(timeout=timeout)
-
     def _loop(self):
         logging.info("WakeWordDetector thread started")
         consecutive_errors = 0
         max_errors = 5
-        
+       
         while self._running_event.is_set():
             try:
                 if self.microphone is None:
                     time.sleep(1)
                     continue
-
                 # Ensure exclusive access to the microphone
                 lock = self._audio_lock
                 _context = lock if lock is not None else threading.Lock()
@@ -202,7 +189,7 @@ class WakeWordDetector:
                             mic_cm = sr.Microphone(device_index=self.microphone_device_index)
                         else:
                             mic_cm = sr.Microphone()
-                        
+                       
                         # Reset error counter on successful mic access
                         consecutive_errors = 0
                     except Exception as e:
@@ -216,12 +203,10 @@ class WakeWordDetector:
                     with mic_cm as source:
                         # Calibrate once
                         # Ambient calibration moved out of wake loop to avoid init crashes
-
                         try:
                             audio = self.recognizer.listen(source, timeout=None, phrase_time_limit=5)
                         except sr.WaitTimeoutError:
-                            continue  # silently ignore timeout
-
+                            continue # silently ignore timeout
                         # Lightweight VAD: skip recognition if captured chunk is extremely quiet
                         try:
                             raw = audio.get_raw_data(convert_rate=16000, convert_width=2)
@@ -232,18 +217,17 @@ class WakeWordDetector:
                                 samples = array.array('h', raw)
                                 avg_amp = sum(abs(s) for s in samples) / max(1, len(samples))
                                 logging.debug(f"Wake VAD avg_amp={avg_amp:.1f}")
-                                if avg_amp < 150:  # tuned threshold; skip likely non-speech
+                                if avg_amp < 150: # tuned threshold; skip likely non-speech
                                     continue
                         except Exception:
                             pass
-
                         try:
                             text = self.recognizer.recognize_google(audio).lower()
                             logging.debug(f"Wake recognized text: {text}")
                             if text:
                                 recognized_text = text
                         except sr.UnknownValueError:
-                            continue  # silently ignore unclear speech
+                            continue # silently ignore unclear speech
                         except sr.RequestError as e:
                             logging.error(f"Speech API error: {e}")
                             continue
@@ -251,23 +235,19 @@ class WakeWordDetector:
                             # Catch any other recognizer issues and keep looping
                             logging.debug("Non-fatal recognition error", exc_info=True)
                             continue
-
                 # Call the callback ONLY after mic context has been exited
                 if recognized_text and self.callback:
                     try:
                         self.callback(recognized_text)
                     except Exception:
                         logging.debug("Callback error after wake recognition", exc_info=True)
-
             except Exception:
                 logging.exception("Error in WakeWordDetector loop")
             time.sleep(0.1)
-
 # ----------------------- Sebas Class -----------------------
 class Sebas:
     def __init__(self):
         logging.info("Initializing Sebas assistant")
-
         self.recognizer = sr.Recognizer()
         # Microphone selection is index-only; device is opened lazily inside context managers
         self.microphone_device_index = self.select_microphone_index()
@@ -277,10 +257,8 @@ class Sebas:
         self.audio_lock = threading.RLock()
         # Presence flag; actual device contexts are created on demand
         self.microphone = True
-
         # Client for the privileged service
         self.service_client = ServiceClient()
-
         # Premium modules
         try:
             from services.voice_manager import VoiceManager
@@ -289,7 +267,7 @@ class Sebas:
             # from integrations.smart_home import HomeAssistantClient
             from integrations.calendar_client import CalendarClient
             from integrations.email_client import EmailClient
-            from integrations.ad_client import ADClient
+            from integrations.ad_client import ADClient  # type: ignore[attr-defined]
             from constants.preferences import PreferenceStore
             from constants.suggestions import SuggestionEngine
             from services.skill_registry import SkillRegistry
@@ -314,7 +292,6 @@ class Sebas:
                 skills_dir = 'skills'
             self.skill_registry = SkillRegistry(self, skills_dir=skills_dir)
             self.skill_registry.load_skill_preferences()
-
             # Language & Voice engine (ElevenLabs with fallback)
             try:
                 # Provide ElevenLabs API key from prefs if available
@@ -332,7 +309,7 @@ class Sebas:
             except Exception:
                 self.language_manager = None
                 self.voice_engine = None
-            
+           
             # Phase 2: Initialize service and process managers
             try:
                 from integrations.windows_service_manager import WindowsServiceManager
@@ -341,7 +318,7 @@ class Sebas:
                 from integrations.firewall_manager import FirewallManager
                 from integrations.port_monitor import PortMonitor
                 #from integrations.vpn_manager import VPNManager
-                
+               
                 if platform.system() == 'Windows':
                     self.service_manager = WindowsServiceManager()
                     self.process_manager = ProcessManager()
@@ -356,7 +333,7 @@ class Sebas:
                     self.firewall_manager = None
                     self.port_monitor = None
                     #self.vpn_manager = None
-                    
+                   
                 # Phase 3: Initialize file operations and storage managers
                 if platform.system() == 'Windows':
                     from integrations.file_operations import FileOperations
@@ -366,7 +343,7 @@ class Sebas:
                 else:
                     self.file_operations = None
                     self.storage_manager = None
-                
+               
                 # Phase 4: Initialize security and compliance managers
                 if platform.system() == 'Windows':
                     from integrations.security_manager import SecurityManager
@@ -376,7 +353,7 @@ class Sebas:
                 else:
                     self.security_manager = None
                     self.compliance_manager = None
-                
+               
                 # Phase 5: Initialize automation and enterprise integration managers
                 from integrations.automation_engine import AutomationEngine
                 from integrations.script_executor import ScriptExecutor
@@ -386,13 +363,13 @@ class Sebas:
                 self.script_executor = ScriptExecutor()
                 self.event_system = EventSystem()
                 self.doc_generator = DocumentationGenerator()
-                
+               
                 if platform.system() == 'Windows':
                     from integrations.task_scheduler import TaskScheduler
                     self.task_scheduler = TaskScheduler()
                 else:
                     self.task_scheduler = None
-                
+               
                 # Phase 6: Initialize AI analytics and NLU enhancement
                 from integrations.ai_analytics import (
                     AnomalyDetector, PredictiveAnalyzer,
@@ -437,29 +414,25 @@ class Sebas:
                 self.intent_resolver = None
         except Exception:
             logging.exception("Failed to initialize premium modules")
-        
+       
         # Initialize Active Directory client (Phase 2) - after prefs is initialized
         try:
             self._initialize_ad_client()
         except Exception:
             logging.exception("Failed to initialize AD client")
             self.ad_client = None
-
         # TTS configuration: refined British butler voice
         try:
             self.configure_butler_tts()
         except Exception:
             logging.exception("Failed to configure TTS")
-
         # Notes and screenshots
         self.notes_file = os.path.join(os.path.expanduser('~'), 'sebas_notes.txt')
         self.screenshots_folder = os.path.join(os.path.expanduser('~'), 'Pictures', 'Screenshots')
         os.makedirs(self.screenshots_folder, exist_ok=True)
-
         # Learned commands storage
         self.learned_file = os.path.join(os.path.expanduser('~'), '.sebas_learned_commands.json')
         self.learned_commands = self._load_learned_commands()
-
         # Program index (installed apps and shortcuts)
         self.program_index_file = os.path.join(os.path.expanduser('~'), '.sebas_program_index.json')
         self.program_index = self._load_program_index()
@@ -470,17 +443,15 @@ class Sebas:
             self._start_program_rescan_thread()
         except Exception:
             logging.exception("Failed to initialize program scanning threads")
-
         # Recognizer thresholds
         self.recognizer.dynamic_energy_threshold = True
         self.recognizer.energy_threshold = 300
         self.recognizer.pause_threshold = 0.8
         self.recognizer.non_speaking_duration = 0.5
         self.recognizer.phrase_threshold = 0.3
-
         # Butler persona configuration
-        self.form_of_address = "sir"  # could be changed to "madam" by user preference
-        
+        self.form_of_address = "sir" # could be changed to "madam" by user preference
+       
         # Phase 1: Optional default TTS language from environment/config
         try:
             default_lang = os.environ.get('SEBAS_TTS_LANGUAGE') or os.environ.get('SEBAS_LANGUAGE')
@@ -488,10 +459,9 @@ class Sebas:
                 self.set_tts_language(default_lang)
         except Exception:
             logging.exception("Failed to apply default TTS language from environment")
-        
+       
         # Initialize AD authentication and role detection
         self._initialize_ad_authentication()
-
     # ----------------------- Microphone Selection (Index only) -----------------------
     def select_microphone_index(self):
         try:
@@ -513,7 +483,6 @@ class Sebas:
         except Exception:
             logging.exception("Microphone index selection failed")
             return None
-
     # ----------------------- TTS -----------------------
     def speak(self, text, proactive=False):
         logging.info(f"Sebas speaking: {text}")
@@ -528,7 +497,7 @@ class Sebas:
                 try:
                     lm = getattr(self, 'language_manager', None)
                     if lm is not None:
-                        lang = lm.current_languagee()
+                        lang = lm.current_language()
                 except Exception:
                     pass
                 used_custom_engine = False
@@ -557,7 +526,7 @@ class Sebas:
                     self.tts_engine.runAndWait()
             # For proactive suggestions, wait a bit for user response
             if proactive:
-                time.sleep(2)  # Give user time to respond
+                time.sleep(2) # Give user time to respond
         except Exception:
             logging.exception("TTS error")
         finally:
@@ -565,7 +534,6 @@ class Sebas:
                 requests.post("http://127.0.0.1:5000/api/status", json={"processing": False}, timeout=0.25)
             except Exception:
                 pass
-
     # ----------------------- Premium: Voice Control -----------------------
     def set_voice_profile(self, profile: str) -> bool:
         try:
@@ -578,7 +546,6 @@ class Sebas:
         except Exception:
             logging.exception("set_voice_profile failed")
             return False
-
     def adjust_voice(self, rate: Optional[int] = None, volume: Optional[float] = None, pitch: Optional[int] = None) -> bool:
         try:
             if not getattr(self, 'voice', None):
@@ -589,7 +556,6 @@ class Sebas:
         except Exception:
             logging.exception("adjust_voice failed")
             return False
-
     # ----------------------- Butler Persona Helpers -----------------------
     def get_time_of_day(self):
         try:
@@ -603,10 +569,8 @@ class Sebas:
             return "night"
         except Exception:
             return "day"
-
     def get_salutation(self):
         return self.form_of_address
-
     def butler_greeting(self):
         tod = self.get_time_of_day()
         sal = self.get_salutation()
@@ -620,43 +584,37 @@ class Sebas:
             return random.choice(options)
         except Exception:
             return options[0]
-
     def speak_formal_ack(self, text):
         # Centralize refined responses
         self.speak(text)
-
     def _parse_language_code(self, language_input: str) -> Optional[str]:
         try:
             lang_mgr = getattr(self, 'language_manager', None)
             if lang_mgr is None:
                 return None
-            
+           
             s = (language_input or '').lower().strip()
-            
+           
             # direct code
             if s in getattr(lang_mgr, 'LANGUAGE_NAMES', {}):
                 return s
-            
+           
             # by name
             for code, name in getattr(lang_mgr, 'LANGUAGE_NAMES', {}).items():
                 if s in name.lower():
                     return code
-            
+           
             return None
         except Exception:
             return None
-
-
     def list_available_voices(self):
         try:
             voices = getattr(self, 'tts_engine', None)
             if voices is None:
                 return []
-
             voices_list = voices.getProperty('voices')
             if not voices_list:
                 voices_list = []
-
             listed = []
             for v in voices_list:
                 info = {
@@ -672,7 +630,6 @@ class Sebas:
         except Exception:
             logging.exception("Failed to list voices")
             return []
-
     # Phase 1: Multilingual TTS selection by language/name
     def set_tts_language(self, language_hint: str) -> bool:
         try:
@@ -680,11 +637,9 @@ class Sebas:
             if not getattr(self, 'tts_engine', None):
                 self.speak("TTS engine not initialized")
                 return False
-
             voices_list = self.tts_engine.getProperty('voices')
             if not voices_list or not isinstance(voices_list, (list, tuple)):
                 voices_list = []
-
             def matches(v):
                 name = (getattr(v, 'name', '') or '').lower()
                 vid = (getattr(v, 'id', '') or '').lower()
@@ -693,10 +648,8 @@ class Sebas:
                     hint in name or hint in vid or hint in langs or
                     hint.replace('_', '-') in name or hint.replace('_', '-') in vid or hint.replace('_', '-') in langs
                 )
-
             candidates = [v for v in voices_list if matches(v)]
             selected = None
-
             if candidates:
                 for v in candidates:
                     if any(k in (getattr(v, 'name', '') or '').lower() for k in ['uk', 'brit', 'en-gb', 'english (united kingdom)']):
@@ -711,23 +664,19 @@ class Sebas:
                     if short and short in langs:
                         selected = v
                         break
-
             if not selected:
                 self.speak(f"I could not find a voice matching {language_hint}")
                 return False
-
             voice_id = getattr(selected, 'id', None)
             if voice_id is None:
                 self.speak(f"Selected voice has no valid ID")
                 return False
-
             self.tts_engine.setProperty('voice', voice_id)
             self.speak(f"Voice set to {getattr(selected, 'name', 'the selected voice')}")
             return True
         except Exception:
             logging.exception("Failed to set TTS language")
             return False
-
     def configure_butler_tts(self):
         # Select best voice and set properties (rate, volume, pitch if supported)
         try:
@@ -736,7 +685,6 @@ class Sebas:
                 self.tts_engine.setProperty('voice', best_id)
         except Exception:
             logging.exception("Voice selection failed; continuing with default")
-
         try:
             self.tts_engine.setProperty('rate', 160)
         except Exception:
@@ -754,12 +702,10 @@ class Sebas:
                 break
             except Exception:
                 continue
-
     def _select_best_voice_id(self):
         voices_list = self.tts_engine.getProperty('voices')
         if not voices_list or not isinstance(voices_list, (list, tuple)):
             voices_list = []
-
         def score(v):
             name = (getattr(v, 'name', '') or '').lower()
             vid = (getattr(v, 'id', '') or '').lower()
@@ -774,7 +720,7 @@ class Sebas:
             # Known good voices
             if any(k in name for k in ['david', 'google uk english male']):
                 s += 25
-            if 'hazel' in name:  # Hazel is British female (still acceptable)
+            if 'hazel' in name: # Hazel is British female (still acceptable)
                 s += 10
             # Tone hints
             if any(k in name for k in ['baritone','bass','deep']):
@@ -785,7 +731,6 @@ class Sebas:
             if 'us' in name or 'zira' in name or 'zira' in vid:
                 s -= 5
             return s
-
         best = None
         best_score = -10**9
         for v in voices_list:
@@ -793,11 +738,8 @@ class Sebas:
             if sc > best_score:
                 best = v
                 best_score = sc
-
         logging.info(f"Selected voice: {getattr(best,'name','default')} (score={best_score})")
         return getattr(best, 'id', None)
-
-
     def test_butler_voice(self):
         phrases = [
             "At your command, sir. Sebas awaits your instructions.",
@@ -807,27 +749,24 @@ class Sebas:
         ]
         for p in phrases:
             self.speak(p)
-
     # ----------------------- Listening -----------------------
     def listen(self, timeout=5, phrase_time_limit=10):
         if self.microphone is None:
             logging.warning("Microphone not available.")
             return ""
-
         try:
             with self.audio_lock:
                 # Open mic lazily; fallback to default device if preferred index fails
                 try:
                     source_cm = sr.Microphone(device_index=self.microphone_device_index)
                 except Exception:
-                    source_cm = sr.Microphone()  # default device
+                    source_cm = sr.Microphone() # default device
                 with source_cm as source:
                     if not hasattr(self, "_mic_calibrated"):
                         # First listen calibration only
                         if getattr(source, "stream", None):
                             self.recognizer.adjust_for_ambient_noise(source, duration=1)
                             self._mic_calibrated = True
-
                     try:
                         requests.post("http://127.0.0.1:5000/api/status", json={"mic": "listening"}, timeout=0.25)
                     except Exception:
@@ -838,7 +777,6 @@ class Sebas:
         except Exception as e:
             logging.exception(f"Error while listening: {e}")
             return ""
-
         try:
             # send a neutral level to animate
             try:
@@ -863,7 +801,6 @@ class Sebas:
                 requests.post("http://127.0.0.1:5000/api/status", json={"mic": "idle"}, timeout=0.25)
             except Exception:
                 pass
-
     # ----------------------- Command Parsing -----------------------
     @safe_call(log_message="Error executing command", speak_message=None)
     def parse_and_execute(self, command):
@@ -879,7 +816,6 @@ class Sebas:
         if not command:
             logging.warning("Empty command received")
             return
-
         # Quick language switch command: "language <name/code>" or "set language <name/code>"
         try:
             if command.startswith('language ') or command.startswith('set language'):
@@ -892,33 +828,36 @@ class Sebas:
                         if lm.set_language(code):
                             self.speak(f"Language set to {lm.get_current_language_name()}")
                             return
-
                 self.speak("Unsupported language")
                 return
         except Exception:
             logging.exception("Language switch handling failed")
-        
+       
         logging.info(f"parse_and_execute called with command: '{command}'")
-
         # Optional polish: allow "service <app>" as synonym for "open <app>"
         try:
-            if command.startswith('service ') and len(command) > len('service '):
-                command = 'open ' + command[len('service '):].strip()
+            if command.startswith('service '):
+                service_cmd = command[len('service '):].strip()
+                if service_cmd.startswith('open '):
+                    # "service open <app>" -> "open <app>"
+                    command = 'open ' + service_cmd[len('open '):].strip()
+                elif len(service_cmd) == 0 or service_cmd == 'open':
+                    # Incomplete "service open" - prompt for app
+                    self.speak("What application would you like to open?")
+                    app_name = self.listen(timeout=5)
+                    if app_name:
+                        command = f"open {app_name}"
+                    else:
+                        return  # Cancelled
+                else:
+                    # "service <app>" -> "open <app>"
+                    command = 'open ' + service_cmd
         except Exception:
             pass
-
-        try:
-            # Record command in preferences for personalization
-            try:
-                self.prefs.record_command(command)
-            except Exception:
-                pass
-
             # Enhanced NLU pass with confidence scoring and fallback
             intent = None
             # Default to the raw command for permission checks if NLU fails
             intent_name_for_check = command
-
             suggestions = []
             try:
                 if getattr(self, 'nlu', None):
@@ -933,11 +872,9 @@ class Sebas:
             except Exception as e:
                 logging.debug(f"NLU parse failed: {e}", exc_info=True)
                 intent = None
-
             if intent:
                 intent_name_for_check = intent.name
                 self.context.add({"type": "intent", "name": intent.name, "slots": intent.slots, "confidence": intent.confidence})
-
                 # Provide confidence feedback for low confidence matches
                 if intent.confidence < 0.8:
                     confidence_msg = f"I detected '{intent.name}' with {intent.confidence:.1%} confidence."
@@ -947,12 +884,10 @@ class Sebas:
                     # Brief pause for user confirmation
                     import time
                     time.sleep(0.5)
-
                 # *** PERMISSION CHECK ***
                 if not self.has_permission(intent.name):
                     logging.warning(f"Permission denied for intent: {intent.name}")
                     return
-
                 # Fix-up for cases where NLU extracted a too-short app name (e.g., 'm')
                 try:
                     if intent.name in ("open_app_with_context", "open_application"):
@@ -967,7 +902,6 @@ class Sebas:
                                     logging.info(f"Fixed app name slot to: {fixed_app}")
                 except Exception:
                     pass
-
                 # Try skills first
                 logging.debug(f"Trying skills for intent: {intent.name}")
                 handled = self.skill_registry.handle_intent(intent.name, intent.slots)
@@ -976,7 +910,7 @@ class Sebas:
                     return
                 else:
                     logging.debug(f"No skill handled intent: {intent.name}")
-                
+               
                 # Fallback to legacy intent handling
                 logging.debug(f"Trying legacy handler for intent: {intent.name}")
                 handled = self._handle_intent(intent.name, intent.slots)
@@ -985,7 +919,6 @@ class Sebas:
                     return
                 else:
                     logging.debug(f"Legacy handler did not handle intent: {intent.name}")
-
             # --- NEW: Explicit open-application parsing (handles "open <app>" and "service open <app>") ---
             try:
                 import re as _re
@@ -1005,12 +938,10 @@ class Sebas:
             except Exception:
                 pass
             # --- END NEW BLOCK ---
-
             # Learned commands take precedence if exact or contained match
             handled = self._try_handle_learned_command(command)
             if handled:
                 return
-
             # Try fallback commands using skills (for commands not handled by NLU)
             # Permission check for fallback commands
             logging.debug(f"Trying fallback handling for command: {command}")
@@ -1026,7 +957,6 @@ class Sebas:
                 return
             else:
                 logging.debug(f"Fallback handling did not handle: {command}")
-
             # Try legacy command handlers
             if command.startswith("learn ") or command.startswith("teach ") or "learn command" in command:
                 self._handle_learn_intent(command)
@@ -1050,12 +980,12 @@ class Sebas:
             elif "speed test" in command:
                 self.run_speed_test()
                 return
-            
+           
             # Fallback to legacy commands
             legacy_handled = self._handle_legacy_commands(command)
             if legacy_handled:
                 return
-            
+           
             # Enhanced fallback handling with suggestions
             if suggestions:
                 suggestion_text = "I didn't understand that command. Did you mean: " + ", or ".join(suggestions)
@@ -1063,10 +993,7 @@ class Sebas:
             else:
                 self.speak("I beg your pardon; I did not quite catch the instruction, " + self.get_salutation() + ". Try saying 'help' for available commands.")
                 logging.warning(f"Command not handled: '{command}'")
-        except Exception as e:
-            logging.exception(f"Error executing command '{command}': {e}")
-            self.speak("I apologize, but an error occurred while processing that command.")
-
+        
     def _handle_legacy_commands(self, command):
         """Handle old-style direct commands for backward compatibility, with permission checks."""
         if "shutdown" in command:
@@ -1078,19 +1005,18 @@ class Sebas:
                 self.restart_computer()
                 return True
         return False
-
     # ----------------------- Active Directory Integration (Phase 2) -----------------------
     def _initialize_ad_client(self):
         """Initialize Active Directory client from preferences."""
         try:
             from integrations.ad_client import ADClient
-            
+           
             ad_config = self.prefs.get_ad_config()
             if not ad_config.get('enabled', False):
                 # AD not enabled, skip initialization
                 self.ad_client = None
                 return
-            
+           
             # Initialize AD client with configuration
             self.ad_client = ADClient(
                 domain=ad_config.get('domain'),
@@ -1098,7 +1024,7 @@ class Sebas:
                 use_windows_auth=ad_config.get('use_windows_auth', True),
                 bind_user=ad_config.get('bind_user')
             )
-            
+           
             # Apply role mappings from preferences
             role_mappings = ad_config.get('role_mappings', {})
             for group, role_name in role_mappings.items():
@@ -1107,27 +1033,27 @@ class Sebas:
                     self.ad_client.set_role_mapping(group, role)
                 except (KeyError, AttributeError):
                     logging.warning(f"Invalid role mapping: {group} -> {role_name}")
-            
+           
             logging.info("Active Directory client initialized")
         except Exception:
             logging.exception("Failed to initialize AD client")
             self.ad_client = None
-    
+   
     def _initialize_ad_authentication(self):
         """Authenticate with AD and set user role based on group membership."""
         try:
             if not hasattr(self, 'ad_client') or not self.ad_client:
                 return
-            
+           
             if not self.ad_client.available():
                 logging.info("AD integration not available")
                 return
-            
+           
             # Get current user info
             user_info = self.ad_client.get_current_user()
             if user_info:
                 logging.info(f"Current user: {user_info.get('username')} ({user_info.get('domain')})")
-            
+           
             # Try to connect to AD
             if self.ad_client.connect():
                 # Get user's role from AD groups
@@ -1136,35 +1062,35 @@ class Sebas:
                     # Set role in preferences (from AD)
                     self.prefs.set_user_role(ad_role, from_ad=True)
                     logging.info(f"User role set from AD: {ad_role.name}")
-                    
+                   
                     # Get user groups for logging
                     groups = self.ad_client.get_user_groups()
                     if groups:
-                        logging.info(f"User AD groups: {', '.join(groups[:10])}")  # Log first 10 groups
+                        logging.info(f"User AD groups: {', '.join(groups[:10])}") # Log first 10 groups
                 else:
                     logging.warning("Could not determine user role from AD")
             else:
                 logging.warning("Failed to connect to Active Directory")
         except Exception:
             logging.exception("Failed to initialize AD authentication")
-    
+   
     def get_ad_user_info(self, username: Optional[str] = None) -> Optional[Dict[str, str]]:
         """
         Get Active Directory user information.
-        
+       
         Args:
             username: Username to look up (optional, uses current user if not provided)
-            
+           
         Returns:
             Dict with user info or None
         """
         try:
             if not hasattr(self, 'ad_client') or not self.ad_client:
                 return None
-            
+           
             if not self.ad_client.available():
                 return None
-            
+           
             if username:
                 return self.ad_client.lookup_user(username)
             else:
@@ -1172,30 +1098,29 @@ class Sebas:
         except Exception:
             logging.exception("Failed to get AD user info")
             return None
-    
+   
     def authenticate_ad_user(self, username: str, password: str) -> bool:
         """
         Authenticate a user against Active Directory.
-        
+       
         Args:
             username: Username
             password: Password
-            
+           
         Returns:
             True if authentication successful
         """
         try:
             if not hasattr(self, 'ad_client') or not self.ad_client:
                 return False
-            
+           
             if not self.ad_client.available():
                 return False
-            
+           
             return self.ad_client.authenticate_user(username, password)
         except Exception:
             logging.exception("AD authentication failed")
             return False
-
     # ----------------------- Utilities -----------------------
     def confirm_action(self, question):
         try:
@@ -1212,19 +1137,18 @@ class Sebas:
             logging.exception("Confirmation check failed.")
             # Fail safe: if listening fails, do not proceed with the action.
             return False
-
     def has_permission(self, intent_name: str) -> bool:
         """Checks if the current user role has permission to execute an intent."""
         try:
             required_role = get_permission_for_intent(intent_name)
             user_role = self.prefs.get_user_role()
-            
+           
             # Ensure both are Role enum instances
             if not isinstance(user_role, type(required_role)) or not isinstance(required_role, type(user_role)):
                 logging.error(f"Invalid role types: user_role={type(user_role)}, required_role={type(required_role)}")
                 # Default to allowing if there's a type mismatch (fail open for now)
                 return True
-            
+           
             # Compare enum values (ADMIN=2 > STANDARD=1)
             def role_to_int(role) -> int:
                 if hasattr(role, 'value'):
@@ -1233,10 +1157,8 @@ class Sebas:
                     return int(role)
                 except Exception:
                     raise TypeError(f"Cannot convert {role!r} to int")
-
             user_value = role_to_int(user_role)
             required_value = role_to_int(required_role)
-
             if user_value >= required_value:
                 return True
             else:
@@ -1247,7 +1169,6 @@ class Sebas:
             logging.exception(f"Error checking permission for intent '{intent_name}': {e}")
             # Default to allowing if there's an error (fail open for now)
             return True
-
     # ----------------------- Program Indexing -----------------------
     def _load_program_index(self):
         try:
@@ -1260,14 +1181,12 @@ class Sebas:
         except Exception:
             logging.exception("Failed to load program index")
             return {}
-
     def _save_program_index(self):
         try:
             with open(self.program_index_file, 'w', encoding='utf-8') as f:
                 json.dump(self.program_index, f, ensure_ascii=False, indent=2)
         except Exception:
             logging.exception("Failed to save program index")
-
     def _maybe_scan_programs_startup(self, max_age_days=7):
         try:
             needs_scan = False
@@ -1285,7 +1204,6 @@ class Sebas:
                 threading.Thread(target=self.scan_installed_programs, daemon=True).start()
         except Exception:
             logging.exception("Startup program scan check failed")
-
     def _start_program_rescan_thread(self):
         def _loop():
             while True:
@@ -1296,7 +1214,6 @@ class Sebas:
                     logging.exception("Background program rescan failed")
         t = threading.Thread(target=_loop, daemon=True)
         t.start()
-
     def scan_installed_programs(self):
         try:
             index = {}
@@ -1311,7 +1228,6 @@ class Sebas:
                         if file.lower().endswith('.lnk'):
                             name = os.path.splitext(file)[0].lower()
                             index[name] = os.path.join(root, file)
-
             # 2) Registry Uninstall keys for DisplayName -> InstallLocation/DisplayIcon
             uninstall_roots = [
                 (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"),
@@ -1343,7 +1259,6 @@ class Sebas:
                                 continue
                 except Exception:
                     continue
-
             # 3) Common quick executables in Program Files root folders (shallow)
             for pf in [os.environ.get('ProgramFiles'), os.environ.get('ProgramFiles(x86)')]:
                 if not pf or not os.path.isdir(pf):
@@ -1354,7 +1269,6 @@ class Sebas:
                         exe = self._find_primary_exe(full, max_depth=1)
                         if exe:
                             index[entry.lower()] = exe
-
             # Merge with existing and save
             self.program_index.update(index)
             self._save_program_index()
@@ -1364,7 +1278,6 @@ class Sebas:
             logging.exception("Program scan failed")
             self.speak("Program scan failed")
             return 0
-
     def _reg_get_string(self, key, value_name):
         try:
             val, typ = winreg.QueryValueEx(key, value_name)
@@ -1375,7 +1288,6 @@ class Sebas:
             return None
         except Exception:
             return None
-
     def _find_primary_exe(self, base_dir, max_depth=2):
         try:
             base_dir = os.path.abspath(base_dir)
@@ -1391,7 +1303,6 @@ class Sebas:
             return None
         except Exception:
             return None
-
     def _handle_list_programs(self, limit=20):
         try:
             if not getattr(self, 'program_index', None):
@@ -1401,7 +1312,6 @@ class Sebas:
             self.speak("Some programs I can open are: " + ", ".join(names))
         except Exception:
             logging.exception("List programs failed")
-
     # ----------------------- Learning -----------------------
     def _load_learned_commands(self):
         try:
@@ -1414,14 +1324,12 @@ class Sebas:
         except Exception:
             logging.exception("Failed to load learned commands")
             return {}
-
     def _save_learned_commands(self):
         try:
             with open(self.learned_file, 'w', encoding='utf-8') as f:
                 json.dump(self.learned_commands, f, ensure_ascii=False, indent=2)
         except Exception:
             logging.exception("Failed to save learned commands")
-
     def _try_handle_learned_command(self, command_text):
         try:
             if not self.learned_commands:
@@ -1439,7 +1347,6 @@ class Sebas:
                 if m:
                     params = {k: (v or '').strip() for k, v in m.groupdict().items()}
                     return self._execute_learned_action(action, params)
-
             # 2) Exact match
             if command_text in self.learned_commands:
                 action = self.learned_commands[command_text]
@@ -1453,22 +1360,20 @@ class Sebas:
         except Exception:
             logging.exception("Failed to handle learned command")
             return False
-
-    
+   
     # def run_shell_command(self, cmd):
-    #     if not self.has_permission('run_shell_command'):
-    #         return
-    #     success, response = self.service_client.send_command('run_shell', {'cmd': cmd})
-    #     if success:
-    #         self.speak("Command sent to the service for execution.")
-    #         if isinstance(response, dict):
-    #             output = response.get('stdout') or response.get('stderr')
-    #         else:
-    #             output = str(response)
-    #         logging.info(f"Service command output: {output}")
-    #     else:
-    #         self.speak(f"Command failed. {response}")
-
+    # if not self.has_permission('run_shell_command'):
+    # return
+    # success, response = self.service_client.send_command('run_shell', {'cmd': cmd})
+    # if success:
+    # self.speak("Command sent to the service for execution.")
+    # if isinstance(response, dict):
+    # output = response.get('stdout') or response.get('stderr')
+    # else:
+    # output = str(response)
+    # logging.info(f"Service command output: {output}")
+    # else:
+    # self.speak(f"Command failed. {response}")
     def _execute_learned_action(self, action, params=None):
         try:
             a_type = (action or {}).get('type')
@@ -1493,8 +1398,6 @@ class Sebas:
         except Exception:
             logging.exception("Learned action execution failed")
             return False
-
-
     def _pattern_to_regex(self, pattern_text):
         # Convert a phrase with {slot} into a regex with named groups
         # Example: "open project {name}" -> r"open\s+project\s+(?P<name>.+)"
@@ -1522,7 +1425,6 @@ class Sebas:
                 safe += ch
             i += 1
         return safe
-
     def _handle_learn_intent(self, command):
         try:
             # Patterns supported:
@@ -1549,7 +1451,6 @@ class Sebas:
                 parts = text.split(' speak ', 1)
                 phrase = parts[0].replace('learn command', '').replace('learn', '').replace('when i say', '').strip().strip('"')
                 action = {'type': 'speak', 'value': parts[1].strip().strip('"')}
-
             phrase = (phrase or '').lower()
             if phrase and action.get('type') and action.get('value'):
                 if '{' in phrase and '}' in phrase:
@@ -1562,7 +1463,6 @@ class Sebas:
         except Exception:
             logging.exception("Learn intent failed")
             self.speak("I failed to learn that command")
-
     def _handle_forget_intent(self, command):
         try:
             text = command.replace('remove command', 'forget').replace('forget command', 'forget')
@@ -1585,7 +1485,6 @@ class Sebas:
             self.speak("I could not find that learned command")
         except Exception:
             logging.exception("Forget intent failed")
-
     def _handle_list_learned(self):
         try:
             if not self.learned_commands:
@@ -1598,7 +1497,6 @@ class Sebas:
             self.speak("Top learned commands are: " + ", ".join(phrases))
         except Exception:
             logging.exception("List learned failed")
-
     # ----------------------- Skill-based Fallback Handling -----------------------
     def _handle_fallback_with_skills(self, command):
         """
@@ -1622,14 +1520,12 @@ class Sebas:
         except Exception as e:
             logging.exception(f"Fallback skill handling failed: {e}")
             return False
-
     def _extract_intent_from_command(self, command):
         """
         Extract intent and slots from raw command text.
         Returns (intent_name, slots_dict) or (None, None)
         """
         cmd = command.lower()
-
         # System commands
         if "shutdown in" in cmd:
             try:
@@ -1649,7 +1545,6 @@ class Sebas:
             return 'hibernate_computer', {}
         elif "log off" in cmd or "sign out" in cmd:
             return 'log_off_user', {}
-
         # Volume and brightness
         elif "volume" in cmd:
             if "mute" in cmd:
@@ -1671,7 +1566,6 @@ class Sebas:
                     return 'set_brightness', {'level': level}
                 except:
                     pass
-
         # CPU and processes
         elif "cpu usage" in cmd or ("cpu" in cmd and ("show" in cmd or "usage" in cmd or "use" in cmd)):
             return 'get_cpu_info', {}
@@ -1681,7 +1575,6 @@ class Sebas:
             proc_name = cmd.split("kill process")[-1].strip()
             if proc_name:
                 return 'kill_process', {'process_name': proc_name}
-
         # System status queries
         elif "system status" in cmd or "what's my system status" in cmd or "check system" in cmd:
             return 'get_system_status', {}
@@ -1689,7 +1582,7 @@ class Sebas:
             return 'get_memory_info', {}
         elif "check memory" in cmd or "show memory" in cmd:
             return 'get_memory_info', {}
-        
+       
         # Application commands
         elif "open" in cmd:
             app_name = cmd.split("open")[-1].strip()
@@ -1701,7 +1594,6 @@ class Sebas:
             return 'list_programs', {}
         elif "learn programs" in cmd or "scan programs" in cmd or "rescan programs" in cmd:
             return 'scan_programs', {}
-
         # File commands
         elif "create folder" in cmd:
             path = cmd.split("create folder")[-1].strip().strip('"')
@@ -1709,20 +1601,16 @@ class Sebas:
         elif "delete" in cmd:
             path = cmd.split("delete")[-1].strip().strip('"')
             return 'delete_path', {'path': path}
-
         # Search
         elif "search for" in cmd:
             query = cmd.split("search for")[-1].strip()
             return 'web_search', {'query': query}
-
         # Weather
         elif "weather" in cmd:
             return 'get_weather', {}
-
         # Battery status
         elif "battery" in cmd or "charge" in cmd:
             return 'get_battery_status', {}
-
         # Printers
         elif "print test page" in cmd:
             return 'print_test_page', {}
@@ -1738,11 +1626,9 @@ class Sebas:
             except Exception:
                 target = ''
             return 'set_default_printer', {'printer_name': target}
-
         # User sessions
         elif "list sessions" in cmd or "active users" in cmd or "list user sessions" in cmd:
             return 'list_user_sessions', {}
-
         # Voice/Language controls
         elif "list voices" in cmd or "available voices" in cmd:
             return 'list_voices', {}
@@ -1752,16 +1638,13 @@ class Sebas:
             except Exception:
                 lang = ''
             return 'set_tts_language', { 'language': lang }
-
         # Single-word app open fallback (e.g., "notepad")
         try:
             if ' ' not in cmd and cmd.isalpha() and len(cmd) >= 2:
                 return 'open_application', {'app_name': cmd}
         except Exception:
             pass
-
         return None, None
-
     # ----------------------- Intent Handling -----------------------
     def _handle_intent(self, name, slots):
         try:
@@ -1800,18 +1683,17 @@ class Sebas:
                 except Exception:
                     return False
             # if name == 'smarthome_toggle':
-            #     ent = (slots.get('device') or '').replace(' ', '_')
-            #     state = (slots.get('state') or 'off') == 'on'
-            #     ok = self.smarthome.set_switch(f"switch.{ent}", state) if getattr(self, 'smarthome', None) else False
-            #     self.speak("Done" if ok else "Unable to control that device")
-            #     return True
+            # ent = (slots.get('device') or '').replace(' ', '_')
+            # state = (slots.get('state') or 'off') == 'on'
+            # ok = self.smarthome.set_switch(f"switch.{ent}", state) if getattr(self, 'smarthome', None) else False
+            # self.speak("Done" if ok else "Unable to control that device")
+            # return True
             if name == 'schedule_event':
                 title = slots.get('title') or 'Untitled'
                 when_text = slots.get('time') or ''
                 dt = None
                 try:
                     # naive parse: accept 'tomorrow 9am' or 'today 3pm'
-                    from datetime import datetime, timedelta
                     now = datetime.now()
                     if 'tomorrow' in when_text:
                         base = now + timedelta(days=1)
@@ -1824,7 +1706,7 @@ class Sebas:
                         tm = when_text
                     tm = tm.replace('am',' am').replace('pm',' pm').strip()
                     # parse hour
-                    m = __import__('re').search(r"(\d{1,2})\s*(am|pm)?", tm)
+                    m = re.search(r"(\d{1,2})\s*(am|pm)?", tm)
                     if m:
                         h = int(m.group(1))
                         mer = m.group(2)
@@ -1839,22 +1721,20 @@ class Sebas:
                     self.speak("I could not parse the time for that event")
                     return True
                 if getattr(self, 'calendar', None):
-                    provider = "microsoft"  # or whatever provider you use
-                    event_title = title if 'title' in locals() else "Untitled Event"
-                    
+                    provider = "microsoft" # or whatever provider you use
+                    event_title = title
+                   
                     start_iso = dt.isoformat()
                     end_iso = (dt + timedelta(hours=1)).isoformat()
-
                     ok, msg = self.calendar.add_event(
                         provider=provider,
                         title=event_title,
                         start_iso=start_iso,
                         end_iso=end_iso,
-                        description=""  # optional
+                        description="" # optional
                     )
                 else:
                     ok = False
-
                 self.speak("Event scheduled" if ok else "Failed to schedule event")
                 return True
             if name == 'send_email':
@@ -1883,7 +1763,6 @@ class Sebas:
         except Exception:
             logging.exception("_handle_intent failed")
             return False
-
     # Phase 1: Battery monitoring
     def get_battery_status(self):
         if not self.has_permission('get_battery_status'): return
@@ -1917,14 +1796,12 @@ class Sebas:
         except Exception:
             logging.exception("Failed to get battery status")
             self.speak("Unable to retrieve battery information")
-
     # ----------------------- System/Admin Actions -----------------------
     def is_admin(self):
         try:
             return bool(ctypes.windll.shell32.IsUserAnAdmin())
         except Exception:
             return False
-
     def shutdown_computer(self):
         if not self.has_permission('shutdown_computer'): return
         if self.confirm_action("Are you sure you want to shut down the computer?"):
@@ -1934,7 +1811,6 @@ class Sebas:
                 self.speak(f"Failed to initiate shutdown. {response}")
         else:
             self.speak("Shutdown cancelled.")
-
     def restart_computer(self):
         if not self.has_permission('restart_computer'): return
         if self.confirm_action("Are you sure you want to restart the computer?"):
@@ -1944,7 +1820,6 @@ class Sebas:
                 self.speak(f"Failed to initiate restart. {response}")
         else:
             self.speak("Restart cancelled.")
-
     def schedule_shutdown(self, minutes):
         if not self.has_permission('schedule_shutdown'): return
         if not self.confirm_action(f"Are you sure you want to schedule a shutdown in {minutes} minutes?"):
@@ -1960,7 +1835,6 @@ class Sebas:
         except Exception as e:
             logging.exception("Failed to schedule shutdown")
             self.speak(f"Failed to schedule shutdown. {e}")
-
     def lock_computer(self):
         if not self.has_permission('lock_computer'): return
         try:
@@ -1970,7 +1844,6 @@ class Sebas:
                 self.speak(f"Failed to lock. {response}")
         except Exception:
             logging.exception("Failed to lock workstation")
-
     def sleep_computer(self):
         if not self.has_permission('sleep_computer'): return
         try:
@@ -1980,20 +1853,17 @@ class Sebas:
                 self.speak(f"Failed to sleep. {response}")
         except Exception:
             logging.exception("Failed to sleep")
-
     def hibernate_computer(self):
         try:
             ctypes.windll.powrprof.SetSuspendState(True, True, True)
         except Exception:
             logging.exception("Failed to hibernate")
-
     def log_off_user(self):
         try: # This does not require admin
             if self.confirm_action("Are you sure you want to sign out?"):
                 subprocess.run(["shutdown", "/l"], check=False)
         except Exception: # pragma: no cover
             logging.exception("Failed to sign out")
-
     def empty_recycle_bin(self):
         try:
             # SHERB_NOCONFIRMATION(0x00000001) | SHERB_NOPROGRESSUI(0x00000002) | SHERB_NOSOUND(0x00000004)
@@ -2003,7 +1873,6 @@ class Sebas:
         except Exception:
             logging.exception("Failed to empty recycle bin")
             self.speak("Failed to empty recycle bin")
-
     def list_processes(self, limit=10):
         if not self.has_permission('list_processes'): return
         try:
@@ -2016,7 +1885,6 @@ class Sebas:
             self.speak(f"Top processes: {names}")
         except Exception:
             logging.exception("Failed to list processes")
-
     def kill_process(self, name_or_pid):
         if not self.has_permission('kill_process'): return
         try:
@@ -2029,12 +1897,10 @@ class Sebas:
                     self.speak(f"Terminated {killed} of your processes.")
                 else:
                     self.speak(f"Could not terminate process. {response}")
-
             else:
                 self.speak(f"Termination signal sent to {name_or_pid}.")
         except Exception:
             logging.exception("Failed to kill process")
-
     def create_folder(self, path):
         if not self.has_permission('create_folder'): return
         try:
@@ -2043,14 +1909,13 @@ class Sebas:
         except Exception:
             logging.exception("Failed to create folder")
             self.speak("Failed to create folder")
-
     def delete_path(self, path):
         if not self.has_permission('delete_path'): return
         try:
             if not self.confirm_action(f"Are you sure you want to permanently delete {os.path.basename(path)}?"):
                 self.speak("Deletion cancelled.")
                 return
-            
+           
             # Use service for privileged deletion
             success, response = self.service_client.send_command('delete_path', {'path': path})
             if success:
@@ -2060,24 +1925,20 @@ class Sebas:
         except Exception:
             logging.exception("Failed to delete path")
             self.speak("Failed to delete path")
-
     def run_shell_command(self, cmd):
         if not self.has_permission('run_shell_command'):
             return
-
         success, response = self.service_client.send_command('run_shell', {'cmd': cmd})
-
         if success:
             self.speak("Command sent to the service for execution.")
             # Ensure response is a dict before calling .get()
             if isinstance(response, dict):
                 output = response.get('stdout') or response.get('stderr')
             else:
-                output = str(response)  # fallback if response is string
+                output = str(response) # fallback if response is string
             logging.info(f"Service command output: {output}")
         else:
             self.speak(f"Command failed. {response}")
-
     # ----------------------- Windows App Control -----------------------
     def open_application(self, app_name):
         if not self.has_permission('open_application'): return
@@ -2093,7 +1954,7 @@ class Sebas:
         # Common synonyms for "This PC/My Computer"
         if name in ("my computer", "this pc", "computer", "thispc"):
             try:
-                subprocess.Popen(["explorer.exe", "shell:MyComputerFolder"])  # Works on modern Windows
+                subprocess.Popen(["explorer.exe", "shell:MyComputerFolder"]) # Works on modern Windows
                 self.speak(f"Opening {app_name} as requested, {self.get_salutation()}.")
                 return
             except Exception:
@@ -2112,12 +1973,12 @@ class Sebas:
                     exe = candidates[0][1]
         if exe is None:
             exe = app_name
-        
+       
         # Ensure we have a valid executable path or name
         if not exe:
             self.speak(f"Could not find application '{app_name}'")
             return
-        
+       
         try:
             # Handle .lnk shortcuts
             if isinstance(exe, str) and exe.lower().endswith('.lnk'):
@@ -2136,7 +1997,6 @@ class Sebas:
         except Exception as e:
             logging.exception(f"Failed to open {app_name} (exe: {exe})")
             self.speak(f"Failed to open {app_name}")
-
     def close_application(self, app_name):
         if not self.has_permission('close_application'): return
         closed = False
@@ -2151,7 +2011,6 @@ class Sebas:
             self.speak(f"{app_name} has been closed, {self.get_salutation()}.")
         else:
             self.speak(f"No running application found with name {app_name}")
-
     def web_search(self, query):
         if not self.has_permission('web_search'): return
         # Handle both skill-based and direct calls
@@ -2161,9 +2020,6 @@ class Sebas:
         webbrowser.open(url)
         self.speak(f"Commencing search for {query}.")
         return True
-
-    from comtypes.client import GetBestInterface
-
     def set_volume(self, level):
         if not self.has_permission('set_volume'):
             return
@@ -2174,17 +2030,15 @@ class Sebas:
             except Exception:
                 level = 0.0
             level = max(0.0, min(1.0, level))
-
             devices = AudioUtilities.GetSpeakers()
             # Explicitly ignore type checking for Activate (Pylance will hush)
-            interface = devices.Activate(  # type: ignore[attr-defined]
+            interface = devices.Activate( # type: ignore[attr-defined]
                 IAudioEndpointVolume._iid_, CLSCTX_ALL, None
             )
             volume = GetBestInterface(interface)
-            volume.SetMasterVolumeLevelScalar(level, None)  # type: ignore[attr-defined]
+            volume.SetMasterVolumeLevelScalar(level, None) # type: ignore[attr-defined]
         except Exception:
             logging.exception("Failed to set volume")
-
     def set_brightness(self, level):
         if not self.has_permission('set_brightness'): return
         try:
@@ -2194,7 +2048,6 @@ class Sebas:
         except Exception:
             logging.exception("Failed to set brightness")
             self.speak("Failed to set brightness")
-
     # ----------------------- Validation Helpers -----------------------
     def _validate_range(self, value, min_value, max_value):
         try:
@@ -2202,7 +2055,6 @@ class Sebas:
             return min_value <= v <= max_value
         except Exception:
             return False
-
     def _validate_safe_path(self, path):
         try:
             p = os.path.abspath(path)
@@ -2210,7 +2062,6 @@ class Sebas:
             return os.path.exists(p) or os.path.isdir(os.path.dirname(p))
         except Exception:
             return False
-
     def _validate_shell_command(self, cmd):
         try:
             if not cmd or len(cmd) > 2048:
@@ -2223,7 +2074,6 @@ class Sebas:
             return not any(x in cl for x in deny)
         except Exception:
             return False
-
     # ----------------------- Info Utilities -----------------------
     def get_weather(self):
         if not self.has_permission('get_weather'): return
@@ -2239,7 +2089,6 @@ class Sebas:
         except Exception:
             logging.exception("Failed to get weather")
             self.speak("Unable to fetch weather right now")
-
     def get_cpu_info(self):
         if not self.has_permission('get_cpu_info'): return
         try:
@@ -2248,7 +2097,6 @@ class Sebas:
             self.speak(f"CPU usage is {int(cpu)} percent. Memory used {int(mem.percent)} percent")
         except Exception:
             logging.exception("Failed to get CPU info")
-
     def create_note(self, note):
         if not self.has_permission('create_note'): return
         try:
@@ -2259,7 +2107,6 @@ class Sebas:
         except Exception:
             logging.exception("Failed to create note")
             self.speak("Failed to save note")
-
     def take_screenshot(self):
         if not self.has_permission('take_screenshot'): return
         try:
@@ -2269,14 +2116,12 @@ class Sebas:
                 img = pyautogui.screenshot()
                 img.save(filename)
             except Exception:
-                from PIL import ImageGrab  # type: ignore
                 img = ImageGrab.grab()
                 img.save(filename)
             self.speak("Screenshot taken")
         except Exception:
             logging.exception("Failed to take screenshot")
             self.speak("Failed to take screenshot")
-
     def get_ip_address(self):
         if not self.has_permission('get_ip_address'): return
         try:
@@ -2285,7 +2130,6 @@ class Sebas:
         except Exception:
             logging.exception("Failed to get IP address")
             self.speak("Unable to get IP address")
-
     def run_speed_test(self):
         if not self.has_permission('run_speed_test'): return
         try:
@@ -2312,13 +2156,12 @@ class Sebas:
         except Exception:
             logging.exception("Failed to run speed test")
             self.speak("Speed test failed")
-
     # ----------------------- Phase 2: Printer Management -----------------------
     def list_printers(self):
         if not self.has_permission('list_printers'): return
         try:
             try:
-                import win32print  # type: ignore
+                import win32print # type: ignore
             except Exception:
                 self.speak("Printer features require Windows printer support on this system")
                 return
@@ -2343,12 +2186,11 @@ class Sebas:
         except Exception:
             logging.exception("Failed to list printers")
             self.speak("Unable to list printers")
-
     def set_default_printer(self, printer_name: str):
         if not self.has_permission('set_default_printer'): return
         try:
             try:
-                import win32print  # type: ignore
+                import win32print # type: ignore
             except Exception:
                 self.speak("Setting the default printer requires Windows printer support")
                 return
@@ -2383,13 +2225,12 @@ class Sebas:
         except Exception:
             logging.exception("Failed to set default printer")
             self.speak("Unable to set the default printer")
-
     def print_test_page(self):
         if not self.has_permission('print_test_page'): return
         try:
             try:
-                import win32print  # type: ignore
-                import win32ui  # type: ignore
+                import win32print # type: ignore
+                import win32ui # type: ignore
             except Exception:
                 self.speak("Printing a test page requires Windows printer support")
                 return
@@ -2401,7 +2242,6 @@ class Sebas:
             if not printer_name:
                 self.speak("No default printer is set")
                 return
-
             # Create a very simple text test page
             hPrinter = win32print.OpenPrinter(printer_name)
             try:
@@ -2423,7 +2263,6 @@ class Sebas:
         except Exception:
             logging.exception("Failed to print test page")
             self.speak("Unable to print the test page")
-
     # ----------------------- Phase 2: User Session Monitoring -----------------------
     def list_user_sessions(self):
         if not self.has_permission('list_user_sessions'): return
@@ -2465,7 +2304,6 @@ class Sebas:
 # ----------------------- Main -----------------------
 if __name__ == "__main__":
     # Admin elevation is now handled by the background service.
-
     assistant = Sebas()
     # Start UI server
     try:
@@ -2477,18 +2315,17 @@ if __name__ == "__main__":
             pass
     except Exception:
         logging.exception("Failed to start UI server")
-    
+   
     # Start API server (Phase 1.3)
     try:
-        from .api_server import APIServer, create_api_server
-        api_server = create_api_server(sebas_instance=assistant, host="127.0.0.1", port=5001)
+        from api.api_server import APIServer, create_api_server
+        api_server = create_api_server(sebas_instance=assistant, host="127.0.0.1", port=5002)
         api_server.start()
-        logging.info("SEBAS API server started on http://127.0.0.1:5001")
+        logging.info("SEBAS API server started on http://127.0.0.1:5002")
     except Exception:
         logging.exception("Failed to start API server")
-    
+   
     assistant.speak(assistant.butler_greeting())
-
     def on_wake_word(text=None):
         text = (text or "").lower()
         # If user said wake word + command in one utterance, execute immediately
@@ -2509,13 +2346,11 @@ if __name__ == "__main__":
             if any(k in text for k in command_keywords):
                 assistant.parse_and_execute(text)
                 return
-
         # Otherwise, do two-step prompt then listen
         assistant.speak("How may I be of service, " + assistant.get_salutation() + "?")
         command = assistant.listen(timeout=10, phrase_time_limit=20)
         if command:
             assistant.parse_and_execute(command)
-
     wake_detector = WakeWordDetector(
         recognizer=assistant.recognizer,
         microphone_device_index=assistant.microphone_device_index,
@@ -2524,7 +2359,6 @@ if __name__ == "__main__":
         audio_lock=assistant.audio_lock
     )
     wake_detector.start()
-
     shutdown_event = threading.Event()
     try:
         while not shutdown_event.is_set():
@@ -2542,3 +2376,14 @@ if __name__ == "__main__":
             assistant.tts_engine.stop()
         except Exception:
             pass
+    def start_sebas():
+        """Entry point for SEBAS launcher."""
+    from sebas.api.api_server import create_api_server
+    import logging
+
+    logging.info("Starting SEBAS Assistant...")
+    server = create_api_server()
+    server.start()
+
+    logging.info("SEBAS Assistant is running.")
+       

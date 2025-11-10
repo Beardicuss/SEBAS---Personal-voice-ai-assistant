@@ -5,6 +5,7 @@ System Skill - Handles system control commands like shutdown, restart, volume, b
 
 from skills.base_skill import BaseSkill
 from typing import Dict, List, Any
+from datetime import datetime, timedelta
 import re
 
 
@@ -119,7 +120,7 @@ class SystemSkill(BaseSkill):
             elif intent == 'daily_summary':
                 return self._handle_daily_summary()
             return False
-        except Exception as e:
+        except Exception:
             self.logger.exception(f"Error handling system intent {intent}")
             self.assistant.speak("An error occurred while executing that command")
             return False
@@ -203,12 +204,11 @@ class SystemSkill(BaseSkill):
             cpu = psutil.cpu_percent(interval=1)
             memory = psutil.virtual_memory()
             disk = psutil.disk_usage('/')
-            
             status = f"System status: CPU {cpu:.1f}%, Memory {memory.percent:.1f}%, Disk {disk.percent:.1f}% used"
             self.assistant.speak(status)
         except Exception:
             self.assistant.speak("Unable to get system status")
-    
+
     def _handle_memory_info(self):
         """Handle get memory info command."""
         try:
@@ -218,12 +218,11 @@ class SystemSkill(BaseSkill):
             used_gb = memory.used / (1024**3)
             available_gb = memory.available / (1024**3)
             percent = memory.percent
-            
             info = f"Memory: {percent:.1f}% used, {used_gb:.1f} GB of {total_gb:.1f} GB total, {available_gb:.1f} GB available"
             self.assistant.speak(info)
         except Exception:
             self.assistant.speak("Unable to get memory information")
-    
+
     def _handle_list_processes(self):
         self.assistant.list_processes()
 
@@ -315,7 +314,7 @@ class SystemSkill(BaseSkill):
             if not items:
                 self.assistant.speak("No headlines found")
                 return True
-            titles = ', '.join(i.get('title') for i in items[:3] if i.get('title'))
+            titles = ', '.join(title for item in items[:3] if (title := item.get('title')) is not None)
             self.assistant.speak(f"Top headlines: {titles}")
             return True
         except Exception:
@@ -332,8 +331,10 @@ class SystemSkill(BaseSkill):
         # Coerce common boolean strings
         if isinstance(value, str):
             val_lower = value.lower().strip()
-            if val_lower in ('true','yes','1','on'): value = True
-            elif val_lower in ('false','no','0','off'): value = False
+            if val_lower in ('true', 'yes', '1', 'on'):
+                value = True
+            elif val_lower in ('false', 'no', '0', 'off'):
+                value = False
         self.assistant.prefs.set_pref(key, value)
         self.assistant.speak("Preference saved")
         return True
@@ -403,13 +404,12 @@ class SystemSkill(BaseSkill):
     # ----------------------- Phase 7.5: Media Keys -----------------------
     def _handle_media_key(self, which: str) -> bool:
         try:
-            # Use keybd_event for media keys to avoid pyautogui limitations
             import ctypes
             user32 = ctypes.windll.user32
             MAP = {
-                'play_pause': 0xB3,  # VK_MEDIA_PLAY_PAUSE
-                'next': 0xB0,        # VK_MEDIA_NEXT_TRACK
-                'prev': 0xB1,        # VK_MEDIA_PREV_TRACK
+                'play_pause': 0xB3,
+                'next': 0xB0,
+                'prev': 0xB1,
             }
             vk = MAP.get(which)
             if not vk:
@@ -447,10 +447,9 @@ class SystemSkill(BaseSkill):
             except Exception:
                 pass
 
-            # Calendar events today (first few)
+            # Calendar events today
             cal_text = "No calendar info."
             try:
-                from datetime import datetime, timedelta
                 from integrations.calendar_client import list_events
                 start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
                 end = start + timedelta(days=1)

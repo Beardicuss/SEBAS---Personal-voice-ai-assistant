@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Storage Management Skill
 Phase 3.2: Storage administration
@@ -7,7 +6,7 @@ Phase 3.2: Storage administration
 from skills.base_skill import BaseSkill
 from typing import Dict, Any
 import logging
-
+from integrations.storage_manager import StorageManager
 
 class StorageSkill(BaseSkill):
     """
@@ -69,6 +68,9 @@ class StorageSkill(BaseSkill):
     
     def _handle_list_disk_partitions(self) -> bool:
         """Handle list disk partitions command."""
+        if self.storage_manager is None:
+            self.assistant.speak("Storage manager not available")
+            return False
         try:
             partitions = self.storage_manager.list_disk_partitions()
             
@@ -87,6 +89,9 @@ class StorageSkill(BaseSkill):
     
     def _handle_get_disk_info(self) -> bool:
         """Handle get disk info command."""
+        if self.storage_manager is None:
+            self.assistant.speak("Storage manager not available")
+            return False
         try:
             disks = self.storage_manager.get_disk_info()
             
@@ -105,6 +110,9 @@ class StorageSkill(BaseSkill):
     
     def _handle_get_volume_info(self) -> bool:
         """Handle get volume info command."""
+        if self.storage_manager is None:
+            self.assistant.speak("Storage manager not available")
+            return False
         try:
             volumes = self.storage_manager.get_volume_info()
             
@@ -129,6 +137,9 @@ class StorageSkill(BaseSkill):
     
     def _handle_get_storage_spaces_status(self) -> bool:
         """Handle get Storage Spaces status command."""
+        if self.storage_manager is None:
+            self.assistant.speak("Storage manager not available")
+            return False
         try:
             pools = self.storage_manager.get_storage_spaces_status()
             
@@ -147,6 +158,9 @@ class StorageSkill(BaseSkill):
     
     def _handle_get_bitlocker_status(self, slots: dict) -> bool:
         """Handle get BitLocker status command."""
+        if self.storage_manager is None:
+            self.assistant.speak("Storage manager not available")
+            return False
         try:
             drive_letter = slots.get('drive_letter')
             status_list = self.storage_manager.get_bitlocker_status(drive_letter)
@@ -168,6 +182,9 @@ class StorageSkill(BaseSkill):
     
     def _handle_enable_bitlocker(self, slots: dict) -> bool:
         """Handle enable BitLocker command."""
+        if self.storage_manager is None:
+            self.assistant.speak("Storage manager not available")
+            return False
         if not self.assistant.has_permission('enable_bitlocker'):
             return False
         
@@ -193,6 +210,9 @@ class StorageSkill(BaseSkill):
     
     def _handle_disable_bitlocker(self, slots: dict) -> bool:
         """Handle disable BitLocker command."""
+        if self.storage_manager is None:
+            self.assistant.speak("Storage manager not available")
+            return False
         if not self.assistant.has_permission('disable_bitlocker'):
             return False
         
@@ -218,6 +238,9 @@ class StorageSkill(BaseSkill):
     
     def _handle_get_disk_usage(self, slots: dict) -> bool:
         """Handle get disk usage command."""
+        if self.storage_manager is None:
+            self.assistant.speak("Storage manager not available")
+            return False
         try:
             path = slots.get('path')
             usage = self.storage_manager.get_disk_usage(path)
@@ -246,4 +269,3 @@ class StorageSkill(BaseSkill):
             logging.exception("Failed to get disk usage")
             self.assistant.speak("Failed to get disk usage")
             return False
-

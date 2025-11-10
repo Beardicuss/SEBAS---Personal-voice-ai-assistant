@@ -3,32 +3,42 @@
 SEBAS API Server
 Phase 1.3: Comprehensive REST API Framework
 """
+import sys
+if 'sebas.api.api_server' in sys.modules:
+    del sys.modules['sebas.api.api_server']
 
 import logging
 import threading
 from datetime import datetime
 from typing import Optional, Dict, Any
 from flask import Flask, jsonify, request, g
+from sebas.constants.permissions import Role
 
 # Optional CORS support
 try:
-    from flask_cors import CORS
+    from flask_cors import CORS  # type: ignore
     CORS_AVAILABLE = True
 except ImportError:
     CORS_AVAILABLE = False
     logging.warning("flask_cors not available. CORS will be disabled.")
 
-from auth import require_auth, require_role, init_auth_manager, get_auth_manager as authmngr
-from rate_limit import rate_limit, init_rate_limiter, get_rate_limiter
-from webhooks import WebhookEvent, init_webhook_manager
-from versioning import get_api_version
-from websocket import WebSocketEvent, init_websocket_manager, get_websocket_manager as websock
-from constants.permissions import Role
+# === FIXED IMPORTS ===
+# Always use relative imports inside the sebas/api package
+from .auth import require_auth, require_role, init_auth_manager, get_auth_manager as authmngr
+from .rate_limit import rate_limit, init_rate_limiter, get_rate_limiter
+from .webhooks import WebhookEvent, init_webhook_manager
+from .versioning import get_api_version
+from .websocket import WebSocketEvent, init_websocket_manager, get_websocket_manager as websock
+from sebas.constants.permissions import Role
 
 
 class APIServer:
     """Main API server for SEBAS."""
+
     def __init__(self, sebas_instance=None, host: str = "127.0.0.1", port: int = 5001):
+        """
+        Initialize the SEBAS API server.
+        """
         self.sebas = sebas_instance
         self.host = host
         self.port = port
@@ -38,16 +48,16 @@ class APIServer:
         if CORS_AVAILABLE:
             CORS(self.app)
 
-        # Initialize components
+        # Initialize core subsystems
         init_auth_manager()
         init_rate_limiter(default_rate=100, default_window=60)
         init_webhook_manager()
         init_websocket_manager(flask_app=self.app)
 
-        # Register routes
+        # Register all routes
         self._register_routes()
 
-        # Swagger documentation (optional)
+        # Swagger docs (optional)
         try:
             from .swagger import register_swagger_routes
             register_swagger_routes(self.app)
@@ -57,14 +67,30 @@ class APIServer:
         self.server_thread: Optional[threading.Thread] = None
         self.running = False
 
+    # =====================================================
+    # === ROUTE REGISTRATION ==============================
+    # =====================================================
     def _register_routes(self):
-        """Register minimal API routes."""
+        """Register basic API endpoints."""
+
         @self.app.route("/api/v1/health", methods=["GET"])
         def health():
+            """Simple health-check endpoint."""
             return jsonify({
                 "status": "ok",
                 "service": "sebas-api",
-                "version": "1.0"
+                "version": get_api_version(),
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            })
+
+        @self.app.route("/api/v1/version", methods=["GET"])
+        def version():
+            """Return current API version info."""
+            return jsonify({
+                "api_version": get_api_version(),
+                "role_system": [role.name for role in Role],
+                "webhooks": True,
+                "websocket": True
             })
 
         @self.app.errorhandler(404)
@@ -74,6 +100,9 @@ class APIServer:
                 "message": "The requested endpoint does not exist"
             }), 404
 
+    # =====================================================
+    # === SERVER STARTUP LOGIC ============================
+    # =====================================================
     def start(self):
         """Start the API server in a background thread."""
         if self.running:
@@ -85,35 +114,63 @@ class APIServer:
         def _run():
             try:
                 logging.info(f"Starting SEBAS API server on {self.host}:{self.port}")
+
                 ws_mgr = websock()
                 socketio_instance = getattr(ws_mgr, "socketio", None)
+
                 if socketio_instance is not None:
-                    logging.info("Using WebSocket-enabled server")
+                    logging.info("Running with WebSocket-enabled server")
                     socketio_instance.run(  # type: ignore[attr-defined]
                         self.app, host=self.host, port=self.port, debug=False, use_reloader=False
                     )
                 else:
-                    logging.info("Using standard Flask server")
+                    logging.info("Running standard Flask server")
                     self.app.run(
                         host=self.host, port=self.port, debug=False, use_reloader=False, threaded=True
                     )
+
             except Exception as e:
                 logging.exception(f"API server error: {e}")
+
             finally:
                 self.running = False
                 logging.info("API server stopped")
 
+        # Launch background thread
         self.server_thread = threading.Thread(target=_run, daemon=True, name="APIServer")
         self.server_thread.start()
 
         import time
         time.sleep(0.5)
+
         if self.server_thread.is_alive():
-            logging.info(f"SEBAS API server started on http://{self.host}:{self.port}")
+            logging.info(f"SEBAS API server started at http://{self.host}:{self.port}")
         else:
             logging.error("Failed to start API server thread")
 
 
+# =====================================================
+# === FACTORY FUNCTION ================================
+# =====================================================
 def create_api_server(sebas_instance=None, host: str = "127.0.0.1", port: int = 5001) -> APIServer:
-    """Factory function to create and configure an API server."""
+    """Factory to create a configured API server instance."""
     return APIServer(sebas_instance=sebas_instance, host=host, port=port)
+if __name__ == "__main__":
+    import logging
+    import time
+
+    logging.basicConfig(level=logging.DEBUG)
+    logging.debug(">>> Starting manual launch of SEBAS API Server...")
+
+    server = create_api_server()
+    logging.debug(">>> Server object created. Attempting to start()...")
+    server.start()
+    logging.debug(">>> server.start() called. Waiting to see if it stays alive...")
+
+    time.sleep(2)
+    logging.debug(f">>> Server running flag = {server.running}")
+    logging.debug(">>> End of main thread; entering idle loop...")
+
+    while True:
+        time.sleep(1)
+

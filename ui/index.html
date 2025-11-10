@@ -3,61 +3,737 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SEBAS - Cyber Butler</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/ui/styles.css" />
+  <title>SEBAS — Neural Command Interface</title>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@300;400;700&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      background: radial-gradient(circle at center, #020202 60%, #000 100%);
+      overflow: hidden;
+      font-family: 'Orbitron', sans-serif;
+      color: #0ff;
+    }
+
+    /* Background grid */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, rgba(0,255,255,0.07) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0,255,255,0.07) 1px, transparent 1px);
+      background-size: 50px 50px;
+      z-index: 0;
+      animation: gridmove 20s linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes gridmove {
+      0% { background-position: 0 0; }
+      100% { background-position: 100px 100px; }
+    }
+
+    /* Outer frame */
+    .frame {
+      position: fixed;
+      inset: 10px;
+      border: 1px solid rgba(0,255,255,0.4);
+      box-shadow: 0 0 10px rgba(0,255,255,0.4);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .frame::before,
+    .frame::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      width: 60%;
+      height: 1px;
+      background: linear-gradient(to right, transparent, rgba(0,255,255,0.5), transparent);
+      transform: translateX(-50%);
+      opacity: 0.4;
+    }
+
+    .frame::before { top: 40px; }
+    .frame::after { bottom: 40px; }
+
+    header {
+      text-align: center;
+      padding: 18px 0 10px;
+      position: relative;
+      z-index: 2;
+    }
+
+    header h1 {
+      font-size: 2.4rem;
+      color: #0ff;
+      text-shadow: 0 0 20px #0ff;
+      letter-spacing: 4px;
+    }
+
+    header h2 {
+      font-size: 0.8rem;
+      color: #08f;
+      opacity: 0.8;
+      text-transform: uppercase;
+      letter-spacing: 6px;
+      margin-top: 4px;
+    }
+
+    /* Top telemetry strip */
+    .top-strip {
+      position: absolute;
+      top: 55px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      height: 70px;
+      display: grid;
+      grid-template-columns: 1.4fr 2fr 1.2fr;
+      gap: 12px;
+      z-index: 2;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+    }
+
+    .top-module {
+      border: 1px solid rgba(0,255,255,0.3);
+      background: rgba(0,0,0,0.6);
+      padding: 6px 10px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .top-module::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(0,255,255,0.15);
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    .top-title {
+      color: rgba(0,255,255,0.8);
+      margin-bottom: 4px;
+      letter-spacing: 2px;
+    }
+
+    /* Fake waveform */
+    .wave {
+      position: relative;
+      width: 100%;
+      height: 30px;
+      overflow: hidden;
+    }
+
+    .wave-line {
+      position: absolute;
+      width: 200%;
+      height: 100%;
+      background-image:
+        linear-gradient(
+          to right,
+          transparent 0%,
+          rgba(0,255,255,0.9) 5%,
+          transparent 10%
+        );
+      background-size: 40px 100%;
+      animation: waveScroll 2.5s linear infinite;
+      opacity: 0.8;
+    }
+
+    @keyframes waveScroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    /* Mini bars top-right */
+    .mini-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 32px;
+      margin-top: 6px;
+    }
+
+    .mini-bar {
+      flex: 1;
+      background: linear-gradient(to top, transparent, #0ff);
+      border-radius: 3px;
+      animation: miniPulse 1.3s ease-in-out infinite alternate;
+    }
+
+    .mini-bar:nth-child(2) { animation-delay: 0.2s; }
+    .mini-bar:nth-child(3) { animation-delay: 0.4s; }
+    .mini-bar:nth-child(4) { animation-delay: 0.6s; }
+
+    @keyframes miniPulse {
+      0% { height: 20%; }
+      100% { height: 100%; }
+    }
+
+    /* Main HUD area */
+    .hud {
+      position: relative;
+      width: 100%;
+      height: calc(100% - 130px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2;
+      padding-top: 40px;
+    }
+
+    /* Central core cluster */
+    .core-wrapper {
+      position: relative;
+      width: 420px;
+      height: 420px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .core {
+      position: relative;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,255,255,0.25) 0%, rgba(0,0,0,0.95) 70%);
+      box-shadow: 0 0 30px #0ff inset, 0 0 30px #0ff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      animation: corePulse 4s ease-in-out infinite;
+      overflow: hidden;
+    }
+
+    @keyframes corePulse {
+      0%, 100% { box-shadow: 0 0 30px #0ff inset, 0 0 30px #0ff; }
+      50% { box-shadow: 0 0 60px #0ff inset, 0 0 60px #0ff; }
+    }
+
+    .core-inner-circle {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,255,255,0.6);
+      box-shadow: 0 0 15px rgba(0,255,255,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    .core-inner-circle span {
+      animation: coreText 2.5s linear infinite;
+    }
+
+    @keyframes coreText {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+
+    /* Rings around the core */
+    .ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(0,255,255,0.3);
+      animation: spin 16s linear infinite;
+    }
+
+    .ring.r1 { width: 300px; height: 300px; animation-duration: 18s; }
+    .ring.r2 { width: 340px; height: 340px; animation-duration: 26s; animation-direction: reverse; border-style: dashed; }
+    .ring.r3 { width: 390px; height: 390px; animation-duration: 34s; border-color: rgba(0,255,255,0.2); }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .radial-ticks {
+      position: absolute;
+      inset: 16%;
+      border-radius: 50%;
+      border: 1px solid rgba(0,255,255,0.2);
+      box-shadow: 0 0 10px rgba(0,255,255,0.3);
+      background-image:
+        repeating-conic-gradient(
+          from 0deg,
+          rgba(0,255,255,0.8) 0deg 1deg,
+          transparent 1deg 6deg
+        );
+      mask-image: radial-gradient(circle, transparent 45%, black 55%);
+      opacity: 0.7;
+      animation: spin 20s linear infinite;
+    }
+
+    /* Radar side panels */
+    .panel-circle {
+      position: absolute;
+      top: 52%;
+      width: 210px;
+      height: 210px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,255,255,0.35);
+      transform: translateY(-50%);
+      overflow: hidden;
+      background: radial-gradient(circle, rgba(0,255,255,0.12), transparent 70%);
+    }
+
+    .panel-circle::before {
+      content: "";
+      position: absolute;
+      inset: 14%;
+      border-radius: 50%;
+      border: 1px dashed rgba(0,255,255,0.35);
+      animation: spin 14s linear infinite;
+    }
+
+    .panel-circle::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: conic-gradient(from 0deg, rgba(0,255,255,0.3), transparent 40%, transparent 60%, rgba(0,255,255,0.3));
+      animation: radarSweep 6s linear infinite;
+    }
+
+    @keyframes radarSweep {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .panel-circle.left { left: 7%; }
+    .panel-circle.right { right: 7%; }
+
+    /* Left/right stacked widgets (graphs etc.) */
+    .side-stack {
+      position: absolute;
+      width: 230px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+    }
+
+    .side-stack.left { left: 4%; top: 18%; }
+    .side-stack.right { right: 4%; top: 18%; }
+
+    .widget {
+      border: 1px solid rgba(0,255,255,0.3);
+      background: rgba(0,0,0,0.65);
+      padding: 6px 8px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .widget::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(0,255,255,0.15);
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    .widget-title {
+      color: rgba(0,255,255,0.7);
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+
+    /* Fake graph line */
+    .graph {
+      position: relative;
+      height: 36px;
+      border-top: 1px solid rgba(0,255,255,0.3);
+      border-bottom: 1px solid rgba(0,255,255,0.3);
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .graph-line {
+      position: absolute;
+      width: 200%;
+      height: 100%;
+      background-size: 60px 100%;
+      background-image:
+        linear-gradient(
+          to right,
+          rgba(0,255,255,0.0) 0%,
+          rgba(0,255,255,0.9) 3%,
+          rgba(0,255,255,0.0) 7%
+        );
+      animation: waveScroll 3s linear infinite;
+      opacity: 0.8;
+    }
+
+    /* Tiny text block for nonsense data */
+    .data-block {
+      margin-top: 4px;
+      color: rgba(0,255,255,0.65);
+      line-height: 1.3;
+      font-size: 0.6rem;
+    }
+
+    /* Bottom scanning strip & bars */
+    .scan-strip {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 70%;
+      text-align: center;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+      letter-spacing: 4px;
+      color: #0ff;
+    }
+
+    .scan-text {
+      display: inline-block;
+      padding: 4px 16px;
+      border: 1px solid rgba(0,255,255,0.5);
+      background: rgba(0,0,0,0.7);
+      box-shadow: 0 0 12px rgba(0,255,255,0.7);
+      animation: scanBlink 1.4s ease-in-out infinite;
+    }
+
+    @keyframes scanBlink {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+
+    .scan-bar {
+      margin-top: 6px;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(to right, transparent, #0ff, transparent);
+      background-size: 200% 100%;
+      animation: scanMove 3s linear infinite;
+      opacity: 0.7;
+    }
+
+    @keyframes scanMove {
+      0% { background-position: 0 0; }
+      100% { background-position: 100% 0; }
+    }
+
+    /* Equalizer at bottom main area */
+    .data-lines {
+      position: absolute;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60%;
+      height: 80px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      opacity: 0.7;
+    }
+
+    .bar {
+      width: 10px;
+      background: linear-gradient(to top, transparent, #0ff);
+      border-radius: 4px;
+      animation: barWave 1.2s ease-in-out infinite alternate;
+    }
+
+    .bar:nth-child(odd) { animation-delay: 0.4s; }
+
+    @keyframes barWave {
+      0% { height: 20%; }
+      100% { height: 100%; }
+    }
+
+    .bar.spike {
+      animation-duration: 0.35s;
+    }
+
+    /* Command console */
+    .console {
+      position: absolute;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      width: 70%;
+      border: 1px solid rgba(0,255,255,0.3);
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      z-index: 3;
+    }
+
+    .console input {
+      flex: 1;
+      padding: 12px 14px;
+      background: transparent;
+      border: none;
+      color: #0ff;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.9rem;
+      letter-spacing: 2px;
+    }
+
+    .console input:focus {
+      outline: none;
+      background: rgba(0,255,255,0.08);
+    }
+
+    .console button {
+      padding: 12px 22px;
+      background: rgba(0,255,255,0.18);
+      color: #0ff;
+      border: none;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all 0.25s;
+      text-transform: uppercase;
+    }
+
+    .console button:hover {
+      background: rgba(0,255,255,0.35);
+      box-shadow: 0 0 10px #0ff;
+    }
+
+    /* Response text above console */
+    .response-box {
+      position: absolute;
+      bottom: 44px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 70%;
+      text-align: center;
+      color: #0ff;
+      font-size: 0.8rem;
+      letter-spacing: 2px;
+      opacity: 0;
+      text-shadow: 0 0 10px #0ff;
+      animation: none;
+      z-index: 3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    @keyframes glitchText {
+      0%, 100% { opacity: 1; text-shadow: 0 0 5px #0ff, 0 0 15px #0ff; }
+      50% { opacity: 0.9; text-shadow: 0 0 5px #f0f, 0 0 18px #0ff; }
+    }
+
+    .core-boost {
+      animation: coreBoost 0.8s ease-out;
+    }
+
+    @keyframes coreBoost {
+      0% { box-shadow: 0 0 30px #0ff inset, 0 0 30px #0ff; }
+      40% { box-shadow: 0 0 85px #0ff inset, 0 0 90px #0ff; }
+      100% { box-shadow: 0 0 30px #0ff inset, 0 0 30px #0ff; }
+    }
+
+    footer {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      text-align: center;
+      padding: 4px 0;
+      font-size: 0.65rem;
+      color: rgba(0,255,255,0.6);
+      letter-spacing: 2px;
+      z-index: 2;
+    }
+
+    /* Responsive-ish */
+    @media (max-width: 900px) {
+      .top-strip { display: none; }
+      .panel-circle { display: none; }
+      .side-stack { display: none; }
+      .core-wrapper { transform: scale(0.8); }
+      .console, .response-box, .scan-strip, .data-lines { width: 90%; }
+    }
+  </style>
 </head>
 <body>
-  <canvas id="bg"></canvas>
-  <div class="overlay-glass"></div>
-  <div class="container">
-    <header class="topbar">
-      <div class="brand">SEBAS</div>
-      <div class="status-group">
-        <div class="status-item" id="mic-status"><span class="dot"></span> Microphone</div>
-        <div class="status-item" id="proc-status"><span class="dot"></span> Processing</div>
-        <div class="status-item" id="sys-status"><span class="dot"></span> System</div>
+  <div class="frame"></div>
+
+  <header>
+    <h1>SEBAS</h1>
+    <h2>NEURAL COMMAND INTERFACE</h2>
+  </header>
+
+  <!-- Top telemetry widgets -->
+  <div class="top-strip">
+    <div class="top-module">
+      <div class="top-title">System Status</div>
+      <div>CORE: ONLINE</div>
+      <div>LINK: STABLE</div>
+      <div>LATENCY: 3.7 MS</div>
+    </div>
+
+    <div class="top-module">
+      <div class="top-title">Signal Telemetry</div>
+      <div class="wave">
+        <div class="wave-line"></div>
       </div>
-    </header>
+    </div>
 
-    <main class="main">
-      <div class="circle">
-        <canvas id="wave"></canvas>
-        <div class="holo">
-          <div class="rings"></div>
-          <div class="title">CYBER BUTLER</div>
-        </div>
+    <div class="top-module">
+      <div class="top-title">Power Vector</div>
+      <div class="mini-bars">
+        <div class="mini-bar"></div>
+        <div class="mini-bar"></div>
+        <div class="mini-bar"></div>
+        <div class="mini-bar"></div>
       </div>
-
-      <section class="panels">
-        <div class="panel">
-          <h3>Listening</h3>
-          <p id="mic-text">Idle</p>
-        </div>
-        <div class="panel">
-          <h3>Processing</h3>
-          <p id="proc-text">Standby</p>
-        </div>
-        <div class="panel">
-          <h3>System</h3>
-          <p id="sys-text">OK</p>
-        </div>
-      </section>
-
-      <section class="command-bar">
-        <form id="cmd-form">
-          <input id="cmd-input" type="text" placeholder="Type a command (e.g., open notepad, shutdown, volume 50)" autocomplete="off"/>
-          <button type="submit">Run</button>
-        </form>
-        <div id="cmd-result" class="cmd-result" aria-live="polite"></div>
-      </section>
-    </main>
-
-    <footer class="footer">© SEBAS — Personal AI Assistant</footer>
+    </div>
   </div>
 
-  <script src="/ui/script.js"></script>
+  <div class="hud">
+    <!-- side radar discs -->
+    <div class="panel-circle left"></div>
+    <div class="panel-circle right"></div>
+
+    <!-- side stacked widgets -->
+    <div class="side-stack left">
+      <div class="widget">
+        <div class="widget-title">Input Stream</div>
+        <div class="graph">
+          <div class="graph-line"></div>
+        </div>
+        <div class="data-block">
+          CH1: 0.998 SYNC<br/>
+          CH2: 0.972 SYNC<br/>
+          NOISE: 0.013
+        </div>
+      </div>
+      <div class="widget">
+        <div class="widget-title">Channel Load</div>
+        <div class="data-block">
+          CPU: 41% • MEM: 63%<br/>
+          THREADS: 128 ACTIVE
+        </div>
+      </div>
+    </div>
+
+    <div class="side-stack right">
+      <div class="widget">
+        <div class="widget-title">Target Vectors</div>
+        <div class="graph">
+          <div class="graph-line"></div>
+        </div>
+        <div class="data-block">
+          LOCK: 03 • RANGE: 742KM<br/>
+          DRIFT: 0.004 Δ/SEC
+        </div>
+      </div>
+      <div class="widget">
+        <div class="widget-title">Diagnostics</div>
+        <div class="data-block">
+          ERR: 0x00 • STATUS: GREEN<br/>
+          LOOPBACK: VERIFIED
+        </div>
+      </div>
+    </div>
+
+    <!-- central core group -->
+    <div class="core-wrapper">
+      <div class="ring r1"></div>
+      <div class="ring r2"></div>
+      <div class="ring r3"></div>
+      <div class="radial-ticks"></div>
+
+      <div class="core" id="core">
+        <div class="core-inner-circle">
+          <span> S </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- equalizer -->
+    <div class="data-lines" id="bars">
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    </div>
+
+    <!-- scanning label -->
+    <div class="scan-strip">
+      <div class="scan-text">SCANNING</div>
+      <div class="scan-bar"></div>
+    </div>
+
+    <!-- responses & console -->
+    <div class="response-box" id="response-box">Awaiting input...</div>
+
+    <form class="console" id="console">
+      <input type="text" id="command" placeholder="ENTER COMMAND...">
+      <button type="submit">EXECUTE</button>
+    </form>
+  </div>
+
+  <footer>© SEBAS SYSTEMS // NODE ONLINE // SIGNAL STABLE</footer>
+
+  <script>
+    const form = document.getElementById('console');
+    const input = document.getElementById('command');
+    const responseBox = document.getElementById('response-box');
+    const core = document.getElementById('core');
+    const barsContainer = document.getElementById('bars');
+    const bars = Array.from(barsContainer.querySelectorAll('.bar'));
+
+    const responses = [
+      "Processing neural request...",
+      "Signal confirmed. Executing protocol.",
+      "Neural pathway aligned.",
+      "Accessing deep archives...",
+      "Quantum response: SUCCESS.",
+      "Warning: minor anomaly detected. Auto-correction engaged.",
+      "Connection stable. Awaiting next directive.",
+      "Vector lock acquired. Trajectory updated."
+    ];
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const cmd = input.value.trim();
+      if (!cmd) return;
+
+      // brief visual boost on core
+      core.classList.remove('core-boost');
+      void core.offsetWidth; // force reflow so animation restarts
+      core.classList.add('core-boost');
+
+      // bar spikes
+      bars.forEach(bar => {
+        bar.classList.add('spike');
+        setTimeout(() => bar.classList.remove('spike'), 400);
+      });
+
+      const msg = responses[Math.floor(Math.random() * responses.length)];
+      responseBox.style.opacity = 0;
+
+      setTimeout(() => {
+        responseBox.textContent = `> ${cmd.toUpperCase()} :: ${msg}`;
+        responseBox.style.opacity = 1;
+        responseBox.style.animation = 'glitchText 1.4s infinite';
+      }, 250);
+
+      input.value = "";
+    });
+  </script>
 </body>
 </html>

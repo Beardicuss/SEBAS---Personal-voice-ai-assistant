@@ -1,0 +1,119 @@
+# -*- coding: utf-8 -*-
+"""
+Compliance Manager
+Handles activity logging, audit event retrieval, and reporting.
+Non-privileged operations use local files; privileged ones route to service.
+"""
+
+import json
+import logging
+import os
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
+
+class ComplianceManager:
+    """
+    Manages compliance logging and reporting.
+    """
+    def __init__(self, service_client):
+        self.service_client = service_client
+        self.activity_log_file = os.path.join(os.environ['APPDATA'], 'SEBAS', 'activity_log.json')
+        os.makedirs(os.path.dirname(self.activity_log_file), exist_ok=True)
+        self._ensure_log_file()
+
+    def _ensure_log_file(self):
+        """Ensure activity log file exists."""
+        if not os.path.exists(self.activity_log_file):
+            with open(self.activity_log_file, 'w', encoding='utf-8') as f:
+                json.dump([], f)
+
+    def log_activity(self, user: str, action: str, resource: str = '', status: str = 'success'):
+        """Log an activity to file."""
+        try:
+            entry = {
+                'timestamp': datetime.now().isoformat(),
+                'user': user,
+                'action': action,
+                'resource': resource,
+                'status': status
+            }
+            with open(self.activity_log_file, 'r+', encoding='utf-8') as f:
+                activities = json.load(f)
+                activities.append(entry)
+                f.seek(0)
+                json.dump(activities, f, indent=2)
+            logging.info(f"Logged activity: {entry}")
+        except Exception as e:
+            logging.exception(f"Failed to log activity: {e}")
+
+    def get_activity_log(self, user: Optional[str] = None, action: Optional[str] = None, 
+                         start_date: Optional[datetime] = None, limit: int = 50) -> List[Dict]:
+        """Retrieve and filter activity logs."""
+        try:
+            with open(self.activity_log_file, 'r', encoding='utf-8') as f:
+                activities = json.load(f)
+            filtered = []
+            for act in reversed(activities):  # Newest first
+                if len(filtered) >= limit:
+                    break
+                if (not user or act['user'] == user) and \
+                   (not action or act['action'] == action) and \
+                   (not start_date or datetime.fromisoformat(act['timestamp']) >= start_date):
+                    filtered.append(act)
+            return filtered
+        except Exception as e:
+            logging.exception(f"Failed to get activity log: {e}")
+            return []
+
+    def get_audit_events(self, event_type: Optional[str] = None, category: Optional[str] = None, 
+                         severity: Optional[str] = None, start_date: Optional[datetime] = None, 
+                         limit: int = 50) -> List[Dict]:
+        """Retrieve audit events via privileged service."""
+        params = {
+            'event_type': event_type,
+            'category': category,
+            'severity': severity,
+            'start_date': start_date.isoformat() if start_date else None,
+            'limit': limit
+        }
+        success, response = self.service_client.send_command('get_audit_events', params)
+        if success:
+            return response.get('events', [])
+        else:
+            logging.error(f"Failed to get audit events: {response}")
+            return []
+
+    def generate_compliance_report(self, start_date: datetime, end_date: datetime) -> Optional[Dict]:
+        """Generate a compliance report."""
+        try:
+            activities = self.get_activity_log(start_date=start_date)
+            total_activities = len(activities)
+            successful = len([a for a in activities if a['status'] == 'success'])
+            success_rate = (successful / total_activities * 100) if total_activities > 0 else 0
+
+            # Include policy verification
+            policy_results = self.verify_security_policy()
+            compliance_status = policy_results.get('compliance_status', 'Unknown') if policy_results else 'Unknown'
+
+            report = {
+                'activity_summary': {
+                    'total_activities': total_activities,
+                    'success_rate': success_rate
+                },
+                'compliance_status': compliance_status,
+                'policy_details': policy_results.get('details', []) if policy_results else []
+            }
+            logging.info(f"Generated compliance report: {report}")
+            return report
+        except Exception as e:
+            logging.exception(f"Failed to generate report: {e}")
+            return None
+
+    def verify_security_policy(self) -> Optional[Dict]:
+        """Verify security policies via privileged service."""
+        success, response = self.service_client.send_command('verify_security_policy')
+        if success:
+            return response.get('results')
+        else:
+            logging.error(f"Failed to verify security policy: {response}")
+            return None

@@ -187,4 +187,3 @@ class NLUSkill(BaseSkill):
             logging.exception("Failed to resolve ambiguous intent")
             self.assistant.speak("Failed to resolve intent")
             return False
-

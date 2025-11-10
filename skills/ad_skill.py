@@ -240,4 +240,3 @@ class ADSkill(BaseSkill):
             logging.exception("Failed to get user groups")
             self.assistant.speak("Failed to get user groups")
             return False
-

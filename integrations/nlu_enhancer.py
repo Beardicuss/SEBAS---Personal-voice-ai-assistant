@@ -360,4 +360,3 @@ class IntentResolver:
         
         # Default: return first candidate
         return candidates[0] if candidates else None
-

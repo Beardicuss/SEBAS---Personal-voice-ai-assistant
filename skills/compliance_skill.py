@@ -31,7 +31,7 @@ class ComplianceSkill(BaseSkill):
         """Initialize compliance manager."""
         try:
             from integrations.compliance_manager import ComplianceManager
-            self.compliance_manager = ComplianceManager()
+            self.compliance_manager = ComplianceManager(self.assistant.service_client)
         except Exception:
             logging.exception("Failed to initialize compliance manager")
             self.compliance_manager = None
@@ -61,6 +61,9 @@ class ComplianceSkill(BaseSkill):
     
     def _handle_log_activity(self, slots: dict) -> bool:
         """Handle log activity command."""
+        if self.compliance_manager is None:
+            self.assistant.speak("Compliance manager not available")
+            return False
         try:
             user = slots.get('user', 'system')
             action = slots.get('action', 'unknown')
@@ -82,6 +85,9 @@ class ComplianceSkill(BaseSkill):
     
     def _handle_get_activity_log(self, slots: dict) -> bool:
         """Handle get activity log command."""
+        if self.compliance_manager is None:
+            self.assistant.speak("Compliance manager not available")
+            return False
         try:
             user = slots.get('user')
             action = slots.get('action')
@@ -111,6 +117,9 @@ class ComplianceSkill(BaseSkill):
     
     def _handle_get_audit_events(self, slots: dict) -> bool:
         """Handle get audit events command."""
+        if self.compliance_manager is None:
+            self.assistant.speak("Compliance manager not available")
+            return False
         try:
             event_type = slots.get('event_type')
             category = slots.get('category')
@@ -142,6 +151,9 @@ class ComplianceSkill(BaseSkill):
     
     def _handle_generate_compliance_report(self, slots: dict) -> bool:
         """Handle generate compliance report command."""
+        if self.compliance_manager is None:
+            self.assistant.speak("Compliance manager not available")
+            return False
         try:
             days = slots.get('days', 30)
             
@@ -174,6 +186,9 @@ class ComplianceSkill(BaseSkill):
     
     def _handle_verify_security_policy(self) -> bool:
         """Handle verify security policy command."""
+        if self.compliance_manager is None:
+            self.assistant.speak("Compliance manager not available")
+            return False
         try:
             results = self.compliance_manager.verify_security_policy()
             
@@ -196,4 +211,3 @@ class ComplianceSkill(BaseSkill):
             logging.exception("Failed to verify security policy")
             self.assistant.speak("Failed to verify security policy")
             return False
-

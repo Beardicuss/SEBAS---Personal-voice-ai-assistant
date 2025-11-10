@@ -95,4 +95,3 @@ class CloudSync:
 				return GoogleDriveClient(token, folder)
 			return None
 		return None
-

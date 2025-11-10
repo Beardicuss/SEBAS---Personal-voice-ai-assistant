@@ -1,13 +1,12 @@
 import socket
 import json
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from .constants.preferences import PreferenceStore
 from .constants.permissions import Role
 
 # Define required roles for commands
-# This could be expanded to be more granular
 COMMAND_PERMISSIONS: Dict[str, Role] = {
     "shutdown": Role.ADMIN,
     "restart": Role.ADMIN,
@@ -21,25 +20,27 @@ COMMAND_PERMISSIONS: Dict[str, Role] = {
     "kill_process": Role.ADMIN,
 }
 
+
 class ServiceClient:
-    def __init__(self, host: str = '127.0.0.1', port: int = 5001):
+    def __init__(self, host: str = "127.0.0.1", port: int = 5001):
         self.host = host
         self.port = port
-        self.prefs = PreferenceStore("preferences.json") # Assuming this is the path
+        self.prefs = PreferenceStore("preferences.json")  # Assuming this is the path
 
-    def send_command(self, command: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
+    def send_command(self, command: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Sends a command to the privileged service after checking permissions.
         """
-        if params is None:
-            params = {}
+        params = params or {}
 
         # 1. Permission Check
         required_role = COMMAND_PERMISSIONS.get(command, Role.STANDARD)
         user_role = self.prefs.get_user_role()
 
         if user_role.value < required_role.value:
-            logging.warning(f"Permission denied for user with role {user_role.name} to run command '{command}'")
+            logging.warning(
+                f"Permission denied for user with role {user_role.name} to run command '{command}'"
+            )
             return {"status": "error", "message": "Permission denied."}
 
         # 2. Send command to service
@@ -47,9 +48,10 @@ class ServiceClient:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((self.host, self.port))
                 request = {"command": command, "params": params}
-                s.sendall(json.dumps(request).encode('utf-8'))
+                s.sendall(json.dumps(request).encode("utf-8"))
                 response_data = s.recv(4096)
-                return json.loads(response_data.decode('utf-8'))
+                return json.loads(response_data.decode("utf-8"))
+
         except ConnectionRefusedError:
             logging.error("Connection to SEBAS service was refused. Is it running?")
             return {"status": "error", "message": "Service connection refused."}

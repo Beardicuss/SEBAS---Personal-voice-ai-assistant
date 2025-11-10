@@ -1,266 +1,173 @@
 # -*- coding: utf-8 -*-
 """
 Windows Firewall Management
-Phase 2.2: Firewall rule creation and modification
+Phase 2.2: Firewall rule creation and modification (hardened version)
 """
 
 import logging
 import subprocess
 import platform
+import shlex
 from typing import Optional, Dict, List, Tuple
 from enum import Enum
 
 
 class FirewallRuleDirection(Enum):
-    """Firewall rule direction"""
-    INBOUND = "inbound"
-    OUTBOUND = "outbound"
+    INBOUND = "in"
+    OUTBOUND = "out"
 
 
 class FirewallRuleAction(Enum):
-    """Firewall rule action"""
     ALLOW = "allow"
     BLOCK = "block"
 
 
 class FirewallRuleProtocol(Enum):
-    """Firewall rule protocol"""
-    TCP = "tcp"
-    UDP = "udp"
-    ANY = "any"
+    TCP = "TCP"
+    UDP = "UDP"
+    ANY = "ANY"
 
 
 class FirewallManager:
-    """
-    Manages Windows Firewall rules.
-    """
-    
+    """Manages Windows Firewall rules using `netsh advfirewall`."""
+
     def __init__(self):
-        """Initialize Firewall Manager."""
         if platform.system() != 'Windows':
             raise RuntimeError("FirewallManager only works on Windows")
-    
-    def create_firewall_rule(self, name: str, direction: FirewallRuleDirection,
-                            action: FirewallRuleAction, protocol: FirewallRuleProtocol,
-                            local_port: Optional[int] = None,
-                            remote_port: Optional[int] = None,
-                            local_ip: Optional[str] = None,
-                            remote_ip: Optional[str] = None,
-                            program: Optional[str] = None,
-                            enabled: bool = True) -> Tuple[bool, str]:
-        """
-        Create a firewall rule.
-        
-        Args:
-            name: Rule name
-            direction: Rule direction (inbound/outbound)
-            action: Rule action (allow/block)
-            protocol: Protocol (tcp/udp/any)
-            local_port: Local port number (optional)
-            remote_port: Remote port number (optional)
-            local_ip: Local IP address (optional)
-            remote_ip: Remote IP address (optional)
-            program: Program path (optional)
-            enabled: Whether rule is enabled
-            
-        Returns:
-            Tuple of (success, message)
-        """
+        self._check_admin_rights()
+
+    def _check_admin_rights(self):
+        """Warn if not running with admin privileges."""
         try:
-            cmd = [
-                "netsh", "advfirewall", "firewall", "add", "rule",
+            import ctypes
+            if not ctypes.windll.shell32.IsUserAnAdmin():
+                logging.warning("[FirewallManager] Not running as Administrator. Commands may fail.")
+        except Exception:
+            pass
+
+    def _run_netsh(self, args: List[str], timeout: int = 15) -> Tuple[bool, str]:
+        """Execute a netsh command safely."""
+        try:
+            cmd = ["netsh", "advfirewall"] + args
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            out = (result.stdout or "").strip()
+            err = (result.stderr or "").strip()
+            msg = err or out
+            if result.returncode == 0:
+                return True, out
+            logging.warning(f"[FirewallManager] netsh failed: {msg}")
+            return False, msg
+        except subprocess.TimeoutExpired:
+            return False, "Command timed out"
+        except FileNotFoundError:
+            return False, "netsh not found (Windows only)"
+        except Exception:
+            logging.exception("[FirewallManager] netsh execution failed")
+            return False, "Unexpected failure"
+
+    def create_firewall_rule(self, name: str,
+                             direction: FirewallRuleDirection,
+                             action: FirewallRuleAction,
+                             protocol: FirewallRuleProtocol,
+                             local_port: Optional[int] = None,
+                             remote_port: Optional[int] = None,
+                             local_ip: Optional[str] = None,
+                             remote_ip: Optional[str] = None,
+                             program: Optional[str] = None,
+                             enabled: bool = True) -> Tuple[bool, str]:
+        """Create a new firewall rule."""
+        try:
+            name = shlex.quote(name)
+            args = [
+                "firewall", "add", "rule",
                 f"name={name}",
                 f"dir={direction.value}",
                 f"action={action.value}",
                 f"protocol={protocol.value}"
             ]
-            
             if local_port:
-                cmd.append(f"localport={local_port}")
+                args.append(f"localport={local_port}")
             if remote_port:
-                cmd.append(f"remoteport={remote_port}")
+                args.append(f"remoteport={remote_port}")
             if local_ip:
-                cmd.append(f"localip={local_ip}")
+                args.append(f"localip={local_ip}")
             if remote_ip:
-                cmd.append(f"remoteip={remote_ip}")
+                args.append(f"remoteip={remote_ip}")
             if program:
-                cmd.append(f"program={program}")
-            
-            cmd.append(f"enable={'yes' if enabled else 'no'}")
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            
-            if result.returncode == 0:
-                logging.info(f"Firewall rule {name} created")
-                return True, f"Firewall rule {name} created successfully"
-            else:
-                error = result.stderr.strip() or result.stdout.strip()
-                return False, error
-                
-        except Exception:
-            logging.exception(f"Failed to create firewall rule: {name}")
-            return False, "Failed to create firewall rule"
-    
-    def delete_firewall_rule(self, name: str) -> Tuple[bool, str]:
-        """
-        Delete a firewall rule.
-        
-        Args:
-            name: Rule name
-            
-        Returns:
-            Tuple of (success, message)
-        """
-        try:
-            result = subprocess.run(
-                ["netsh", "advfirewall", "firewall", "delete", "rule", f"name={name}"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            
-            if result.returncode == 0:
-                logging.info(f"Firewall rule {name} deleted")
-                return True, f"Firewall rule {name} deleted successfully"
-            else:
-                error = result.stderr.strip() or result.stdout.strip()
-                return False, error
-                
-        except Exception:
-            logging.exception(f"Failed to delete firewall rule: {name}")
-            return False, "Failed to delete firewall rule"
-    
-    def list_firewall_rules(self, name_filter: Optional[str] = None) -> List[Dict[str, str]]:
-        """
-        List firewall rules.
-        
-        Args:
-            name_filter: Optional name filter
-            
-        Returns:
-            List of rule information dicts
-        """
-        try:
-            cmd = ["netsh", "advfirewall", "firewall", "show", "rule", "name=all"]
-            if name_filter:
-                cmd = ["netsh", "advfirewall", "firewall", "show", "rule", f"name={name_filter}"]
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            
-            if result.returncode != 0:
-                return []
-            
-            rules = []
-            current_rule = {}
-            
-            for line in result.stdout.split('\n'):
-                line = line.strip()
-                if not line:
-                    if current_rule:
-                        rules.append(current_rule)
-                        current_rule = {}
-                    continue
-                
-                if 'Rule Name' in line and ':' in line:
-                    if current_rule:
-                        rules.append(current_rule)
-                    current_rule = {'name': line.split(':', 1)[1].strip()}
-                elif ':' in line:
-                    key, value = line.split(':', 1)
-                    key = key.strip().lower().replace(' ', '_')
-                    value = value.strip()
-                    if current_rule:
-                        current_rule[key] = value
-            
-            if current_rule:
-                rules.append(current_rule)
-            
-            return rules
-            
-        except Exception:
-            logging.exception("Failed to list firewall rules")
-            return []
-    
-    def enable_firewall_rule(self, name: str) -> Tuple[bool, str]:
-        """
-        Enable a firewall rule.
-        
-        Args:
-            name: Rule name
-            
-        Returns:
-            Tuple of (success, message)
-        """
-        try:
-            result = subprocess.run(
-                ["netsh", "advfirewall", "firewall", "set", "rule", f"name={name}", "new", "enable=yes"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            
-            if result.returncode == 0:
-                return True, f"Rule {name} enabled"
-            else:
-                error = result.stderr.strip() or result.stdout.strip()
-                return False, error
-                
-        except Exception:
-            logging.exception(f"Failed to enable firewall rule: {name}")
-            return False, "Failed to enable firewall rule"
-    
-    def disable_firewall_rule(self, name: str) -> Tuple[bool, str]:
-        """
-        Disable a firewall rule.
-        
-        Args:
-            name: Rule name
-            
-        Returns:
-            Tuple of (success, message)
-        """
-        try:
-            result = subprocess.run(
-                ["netsh", "advfirewall", "firewall", "set", "rule", f"name={name}", "new", "enable=no"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            
-            if result.returncode == 0:
-                return True, f"Rule {name} disabled"
-            else:
-                error = result.stderr.strip() or result.stdout.strip()
-                return False, error
-                
-        except Exception:
-            logging.exception(f"Failed to disable firewall rule: {name}")
-            return False, "Failed to disable firewall rule"
-    
-    def get_firewall_status(self) -> Dict[str, str]:
-        """
-        Get firewall status.
-        
-        Returns:
-            Dict with firewall status information
-        """
-        try:
-            result = subprocess.run(
-                ["netsh", "advfirewall", "show", "allprofiles", "state"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            
-            status = {}
-            for line in result.stdout.split('\n'):
-                line = line.strip()
-                if 'State' in line and ':' in line:
-                    status['state'] = line.split(':', 1)[1].strip()
-            
-            return status
-            
-        except Exception:
-            logging.exception("Failed to get firewall status")
-            return {}
+                args.append(f"program={program}")
+            args.append(f"enable={'yes' if enabled else 'no'}")
 
+            ok, msg = self._run_netsh(args)
+            if ok:
+                logging.info(f"[FirewallManager] Created rule {name}")
+                return True, f"Firewall rule '{name}' created successfully"
+            return False, msg
+        except Exception:
+            logging.exception("[FirewallManager] Failed to create rule")
+            return False, "Exception while creating rule"
+
+    def delete_firewall_rule(self, name: str) -> Tuple[bool, str]:
+        """Delete a firewall rule."""
+        name = shlex.quote(name)
+        ok, msg = self._run_netsh(["firewall", "delete", "rule", f"name={name}"])
+        if ok:
+            logging.info(f"[FirewallManager] Deleted rule {name}")
+            return True, f"Firewall rule '{name}' deleted"
+        return False, msg
+
+    def list_firewall_rules(self, name_filter: Optional[str] = None) -> Tuple[bool, List[Dict[str, str]]]:
+        """List firewall rules (optionally filtered by name)."""
+        args = ["firewall", "show", "rule", f"name={name_filter or 'all'}"]
+        ok, output = self._run_netsh(args, timeout=30)
+        if not ok:
+            return False, []
+
+        rules: List[Dict[str, str]] = []
+        current_rule: Dict[str, str] = {}
+
+        for line in output.splitlines():
+            line = line.strip()
+            if not line:
+                if current_rule:
+                    rules.append(current_rule)
+                    current_rule = {}
+                continue
+            if ':' in line:
+                key, value = line.split(':', 1)
+                key = key.strip().lower().replace(' ', '_')
+                value = value.strip()
+                current_rule[key] = value
+        if current_rule:
+            rules.append(current_rule)
+        return True, rules
+
+    def set_firewall_rule_state(self, name: str, enable: bool) -> Tuple[bool, str]:
+        """Enable or disable a firewall rule."""
+        name = shlex.quote(name)
+        state = 'yes' if enable else 'no'
+        ok, msg = self._run_netsh(["firewall", "set", "rule", f"name={name}", "new", f"enable={state}"])
+        if ok:
+            action = "enabled" if enable else "disabled"
+            return True, f"Firewall rule '{name}' {action}"
+        return False, msg
+
+    def get_firewall_status(self) -> Tuple[bool, Dict[str, str]]:
+        """Return overall firewall state for all profiles."""
+        ok, output = self._run_netsh(["show", "allprofiles", "state"])
+        if not ok:
+            return False, {}
+
+        status: Dict[str, str] = {}
+        current_profile = None
+        for line in output.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if line.lower().endswith("profile settings:"):
+                current_profile = line.split()[0].lower()
+            elif ":" in line:
+                key, val = line.split(":", 1)
+                key, val = key.strip(), val.strip()
+                if current_profile and "state" in key.lower():
+                    status[current_profile] = val
+        return True, status

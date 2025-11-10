@@ -1,19 +1,18 @@
-# -*- coding: utf-8 -*-
 """
-VPN Connection Management
-Phase 2.2: VPN connection management (establish/disconnect)
+VPN Connection Management (Hardened)
+Phase 2.2: Windows-only implementation.
 """
 
 import logging
 import subprocess
 import platform
-import re
+import json
+import shlex
 from typing import Optional, Dict, List, Tuple
 from enum import Enum
 
 
 class VPNConnectionState(Enum):
-    """VPN connection states"""
     CONNECTED = "connected"
     DISCONNECTED = "disconnected"
     CONNECTING = "connecting"
@@ -22,163 +21,133 @@ class VPNConnectionState(Enum):
 
 
 class VPNManager:
-    """
-    Manages VPN connections.
-    """
-    
+    """Manages Windows VPN connections via PowerShell or rasdial."""
+
     def __init__(self):
-        """Initialize VPN Manager."""
-        if platform.system() != 'Windows':
+        if platform.system() != "Windows":
             raise RuntimeError("VPNManager only works on Windows")
-    
+
+    # --------------------------------------------------------------
+    # LIST CONNECTIONS
+    # --------------------------------------------------------------
     def list_vpn_connections(self) -> List[Dict[str, str]]:
-        """
-        List available VPN connections.
-        
-        Returns:
-            List of VPN connection information dicts
-        """
+        """List all configured VPN connections using PowerShell or rasphone fallback."""
         try:
-            result = subprocess.run(
-                ["rasphone", "-l"],
-                capture_output=True,
-                text=True,
-                timeout=10
+            ps_cmd = (
+                "Get-VpnConnection | "
+                "Select-Object Name, ServerAddress, ConnectionStatus | "
+                "ConvertTo-Json -Compress"
             )
-            
-            # Alternative: use PowerShell to get VPN connections
-            ps_cmd = "Get-VpnConnection | Select-Object Name, ServerAddress, ConnectionStatus | ConvertTo-Json"
             result = subprocess.run(
                 ["powershell", "-Command", ps_cmd],
                 capture_output=True,
                 text=True,
                 timeout=10
             )
-            
-            vpns = []
-            if result.returncode == 0:
+
+            vpns: List[Dict[str, str]] = []
+            if result.returncode == 0 and result.stdout.strip():
                 try:
-                    import json
                     data = json.loads(result.stdout)
-                    if isinstance(data, list):
-                        for vpn in data:
-                            vpns.append({
-                                'name': vpn.get('Name', ''),
-                                'server': vpn.get('ServerAddress', ''),
-                                'status': vpn.get('ConnectionStatus', 'Unknown')
-                            })
-                    elif isinstance(data, dict):
+                    if isinstance(data, dict):
+                        data = [data]
+                    for vpn in data:
                         vpns.append({
-                            'name': data.get('Name', ''),
-                            'server': data.get('ServerAddress', ''),
-                            'status': data.get('ConnectionStatus', 'Unknown')
+                            "name": vpn.get("Name", ""),
+                            "server": vpn.get("ServerAddress", ""),
+                            "status": vpn.get("ConnectionStatus", "Unknown"),
                         })
-                except:
-                    # Parse text output if JSON fails
-                    pass
-            
-            return vpns
-            
-        except Exception:
-            logging.exception("Failed to list VPN connections")
-            return []
-    
-    def connect_vpn(self, vpn_name: str) -> Tuple[bool, str]:
-        """
-        Connect to a VPN.
-        
-        Args:
-            vpn_name: VPN connection name
-            
-        Returns:
-            Tuple of (success, message)
-        """
-        try:
-            # Use rasdial command
+                    return vpns
+                except json.JSONDecodeError:
+                    pass  # Fallback to rasphone below
+
+            # ---- Fallback (legacy) ----
             result = subprocess.run(
-                ["rasdial", vpn_name],
+                ["rasphone", "-l"],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=10
             )
-            
-            if result.returncode == 0:
-                logging.info(f"VPN {vpn_name} connected")
-                return True, f"VPN {vpn_name} connected successfully"
-            else:
-                error = result.stderr.strip() or result.stdout.strip()
-                return False, error
-                
-        except subprocess.TimeoutExpired:
-            return False, "VPN connection timeout"
+            lines = [l.strip() for l in result.stdout.splitlines() if l.strip()]
+            for line in lines:
+                if not line.lower().startswith("rasphone"):
+                    vpns.append({"name": line, "server": "", "status": "Unknown"})
+            return vpns
+
         except Exception:
-            logging.exception(f"Failed to connect VPN: {vpn_name}")
-            return False, "Failed to connect VPN"
-    
-    def disconnect_vpn(self, vpn_name: Optional[str] = None) -> Tuple[bool, str]:
-        """
-        Disconnect from a VPN.
-        
-        Args:
-            vpn_name: VPN connection name (optional, disconnects all if not specified)
-            
-        Returns:
-            Tuple of (success, message)
-        """
+            logging.exception("list_vpn_connections failed")
+            return []
+
+    # --------------------------------------------------------------
+    # CONNECT / DISCONNECT
+    # --------------------------------------------------------------
+    def connect_vpn(self, vpn_name: str,
+                    username: Optional[str] = None,
+                    password: Optional[str] = None) -> Tuple[bool, str]:
+        """Connect to a VPN connection. Optional credentials supported."""
         try:
-            if vpn_name:
-                result = subprocess.run(
-                    ["rasdial", vpn_name, "/disconnect"],
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
-            else:
-                result = subprocess.run(
-                    ["rasdial", "/disconnect"],
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
-            
+            name = shlex.quote(vpn_name)
+            cmd = ["rasdial", name]
+            if username and password:
+                cmd.extend([username, password])
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+
             if result.returncode == 0:
-                logging.info(f"VPN {vpn_name or 'all'} disconnected")
-                return True, f"VPN {vpn_name or 'all'} disconnected successfully"
+                logging.info(f"VPN '{vpn_name}' connected.")
+                return True, f"VPN '{vpn_name}' connected successfully."
             else:
-                error = result.stderr.strip() or result.stdout.strip()
-                return False, error
-                
+                err = result.stderr.strip() or result.stdout.strip()
+                return False, err or "Failed to connect VPN."
+
+        except subprocess.TimeoutExpired:
+            return False, "VPN connection timed out."
         except Exception:
-            logging.exception(f"Failed to disconnect VPN: {vpn_name or 'all'}")
-            return False, "Failed to disconnect VPN"
-    
+            logging.exception("connect_vpn failed")
+            return False, f"Failed to connect to VPN '{vpn_name}'."
+
+    def disconnect_vpn(self, vpn_name: Optional[str] = None) -> Tuple[bool, str]:
+        """Disconnect one or all VPN connections."""
+        try:
+            cmd = ["rasdial"]
+            if vpn_name:
+                cmd.append(vpn_name)
+            cmd.append("/disconnect")
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+
+            if result.returncode == 0:
+                msg = f"VPN '{vpn_name or 'all'}' disconnected successfully."
+                logging.info(msg)
+                return True, msg
+            else:
+                err = result.stderr.strip() or result.stdout.strip()
+                return False, err or "Failed to disconnect VPN."
+
+        except Exception:
+            logging.exception("disconnect_vpn failed")
+            return False, f"Failed to disconnect VPN '{vpn_name or 'all'}'."
+
+    # --------------------------------------------------------------
+    # STATUS
+    # --------------------------------------------------------------
     def get_vpn_status(self, vpn_name: str) -> Optional[VPNConnectionState]:
-        """
-        Get VPN connection status.
-        
-        Args:
-            vpn_name: VPN connection name
-            
-        Returns:
-            VPNConnectionState or None
-        """
+        """Return VPN status if known."""
         try:
             vpns = self.list_vpn_connections()
             for vpn in vpns:
-                if vpn.get('name') == vpn_name:
-                    status_str = vpn.get('status', '').lower()
-                    if 'connected' in status_str:
+                if vpn.get("name", "").lower() == vpn_name.lower():
+                    status = vpn.get("status", "").lower()
+                    if "connected" in status:
                         return VPNConnectionState.CONNECTED
-                    elif 'disconnected' in status_str:
+                    if "disconnected" in status:
                         return VPNConnectionState.DISCONNECTED
-                    elif 'connecting' in status_str:
+                    if "connecting" in status:
                         return VPNConnectionState.CONNECTING
-                    else:
-                        return VPNConnectionState.UNKNOWN
-            
+                    if "disconnecting" in status:
+                        return VPNConnectionState.DISCONNECTING
+                    return VPNConnectionState.UNKNOWN
             return None
-            
         except Exception:
-            logging.exception(f"Failed to get VPN status for {vpn_name}")
+            logging.exception("get_vpn_status failed")
             return None
-
