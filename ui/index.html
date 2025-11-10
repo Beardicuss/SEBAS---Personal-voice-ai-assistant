@@ -689,51 +689,54 @@
   <footer>© SEBAS SYSTEMS // NODE ONLINE // SIGNAL STABLE</footer>
 
   <script>
-    const form = document.getElementById('console');
-    const input = document.getElementById('command');
-    const responseBox = document.getElementById('response-box');
-    const core = document.getElementById('core');
-    const barsContainer = document.getElementById('bars');
-    const bars = Array.from(barsContainer.querySelectorAll('.bar'));
+    (() => {
+  const API_URL = "http://127.0.0.1:5002/api/parse"; // Sebas backend
 
-    const responses = [
-      "Processing neural request...",
-      "Signal confirmed. Executing protocol.",
-      "Neural pathway aligned.",
-      "Accessing deep archives...",
-      "Quantum response: SUCCESS.",
-      "Warning: minor anomaly detected. Auto-correction engaged.",
-      "Connection stable. Awaiting next directive.",
-      "Vector lock acquired. Trajectory updated."
-    ];
+  const form = document.getElementById("console");
+  const input = document.getElementById("command");
+  const responseBox = document.getElementById("response-box");
+  const core = document.getElementById("core");
+  const barsContainer = document.getElementById("bars");
+  const bars = Array.from(barsContainer.querySelectorAll(".bar"));
 
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const cmd = input.value.trim();
-      if (!cmd) return;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const cmd = input.value.trim();
+    if (!cmd) return;
 
-      // brief visual boost on core
-      core.classList.remove('core-boost');
-      void core.offsetWidth; // force reflow so animation restarts
-      core.classList.add('core-boost');
+    // --- Visual feedback ---
+    core.classList.remove("core-boost");
+    void core.offsetWidth;
+    core.classList.add("core-boost");
 
-      // bar spikes
-      bars.forEach(bar => {
-        bar.classList.add('spike');
-        setTimeout(() => bar.classList.remove('spike'), 400);
+    bars.forEach((bar) => {
+      bar.classList.add("spike");
+      setTimeout(() => bar.classList.remove("spike"), 400);
+    });
+
+    responseBox.textContent = "> Processing...";
+    responseBox.style.opacity = 1;
+    responseBox.style.animation = "glitchText 1.4s infinite";
+
+    // --- Backend request ---
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: cmd }),
       });
 
-      const msg = responses[Math.floor(Math.random() * responses.length)];
-      responseBox.style.opacity = 0;
+      const data = await res.json();
+      const msg = data?.response || data?.message || "No response";
+      responseBox.textContent = "> " + cmd.toUpperCase() + " :: " + msg;
+    } catch (err) {
+      console.error("Fetch error:", err);
+      responseBox.textContent = "> " + cmd.toUpperCase() + " :: connection error";
+    }
 
-      setTimeout(() => {
-        responseBox.textContent = `> ${cmd.toUpperCase()} :: ${msg}`;
-        responseBox.style.opacity = 1;
-        responseBox.style.animation = 'glitchText 1.4s infinite';
-      }, 250);
-
-      input.value = "";
-    });
+    input.value = "";
+  });
+})();
   </script>
 </body>
 </html>
