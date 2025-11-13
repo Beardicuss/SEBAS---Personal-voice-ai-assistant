@@ -1,5 +1,5 @@
-import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+import sys
+import os
 import logging
 import traceback
 import threading
@@ -11,20 +11,20 @@ import platform
 import psutil
 import requests
 import webbrowser
-from datetime import datetime, timedelta
+import pyaudio
 import screen_brightness_control as sbc
-from ctypes import cast, POINTER
 import ctypes
 import json
 import re
 import winreg
 import webbrowser as _web
 import socket
+from datetime import datetime, timedelta
+from ctypes import cast, POINTER
 from typing import Optional, Dict, Any
-from services.voice_engine import VoiceEngineManager
-from services.language_manager import LanguageManager
-from constants.permissions import Role, get_permission_for_intent
-import pyaudio
+from sebas.services.voice_system import VoiceSystem
+from sebas.services.language_manager import LanguageManager
+from sebas.constants.permissions import Role, get_permission_for_intent
 from comtypes import POINTER, cast
 from comtypes import CLSCTX_ALL, cast
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
@@ -255,8 +255,8 @@ class Sebas:
         self.recognizer = sr.Recognizer()
         # Microphone selection is index-only; device is opened lazily inside context managers
         self.microphone_device_index = self.select_microphone_index()
-        from services.voice_engine import VoiceEngineManager
-        self.tts_engine = VoiceEngineManager()
+        from sebas.services.voice_system import VoiceSystem
+        self.tts_engine = VoiceSystem()
         self.system = platform.system()
         # Ensure exclusive access to audio I/O across threads
         self.audio_lock = threading.RLock()
@@ -265,31 +265,61 @@ class Sebas:
         # Client for the privileged service
         self.service_client = ServiceClient()
         # Premium modules
+                # Premium modules (без жесткой зависимости от AD)
+        # Premium modules (без жесткой зависимости от AD)
         try:
-            from services.voice_manager import VoiceManager
-            from services.nlu import SimpleNLU, ContextManager
-            from services.task_manager import TaskManager
+            from sebas.services.nlu import SimpleNLU, ContextManager
+            from sebas.services.task_manager import TaskManager
             # from integrations.smart_home import HomeAssistantClient
-            from integrations.calendar_client import CalendarClient
-            from integrations.email_client import EmailClient
-            from integrations.ad_client import ADClient  # type: ignore[attr-defined]
-            from constants.preferences import PreferenceStore
-            from constants.suggestions import SuggestionEngine
-            from services.skill_registry import SkillRegistry
-            self.voice = VoiceManager(self.tts_engine)
-            self.voice.apply_current()
+            from sebas.integrations.calendar_client import CalendarClient
+            from sebas.integrations.email_client import EmailClient
+            from sebas.constants.preferences import PreferenceStore
+            from sebas.constants.suggestions import SuggestionEngine
+            from core.skill_registry import SkillRegistry
+
+            self.voice = self.tts_engine
             self.nlu = SimpleNLU()
             self.context = ContextManager()
             self.tasks = TaskManager()
-            #self.smarthome = HomeAssistantClient()
+            # self.smarthome = HomeAssistantClient()
             self.calendar = CalendarClient()
             self.email = EmailClient()
             try:
                 profile_dir = PROFILE_DIR
             except Exception:
                 profile_dir = os.path.join(os.path.expanduser('~'), '.sebas')
+
             self.prefs = PreferenceStore(os.path.join(profile_dir, 'prefs.json'))
             self.suggestions = SuggestionEngine(self.prefs)
+        except Exception:
+            logging.exception("Failed to initialize premium modules")
+
+            # Phase 2–6 как у тебя дальше (WindowsServiceManager, NetworkManager и прочее)
+                    # Premium modules (без жесткой зависимости от AD)
+        try:
+            from sebas.services.nlu import SimpleNLU, ContextManager
+            from sebas.services.task_manager import TaskManager
+            from sebas.integrations.calendar_client import CalendarClient
+            from sebas.integrations.email_client import EmailClient
+            from sebas.constants.preferences import PreferenceStore
+            from sebas.constants.suggestions import SuggestionEngine
+            from core.skill_registry import SkillRegistry
+
+            # VoiceSystem уже инициализирован как self.tts_engine
+            self.voice = self.tts_engine
+            self.nlu = SimpleNLU()
+            self.context = ContextManager()
+            self.tasks = TaskManager()
+            self.calendar = CalendarClient()
+            self.email = EmailClient()
+
+            try:
+                profile_dir = PROFILE_DIR
+            except Exception:
+                profile_dir = os.path.join(os.path.expanduser('~'), '.sebas')
+            self.prefs = PreferenceStore(os.path.join(profile_dir, 'prefs.json'))
+            self.suggestions = SuggestionEngine(self.prefs)
+
             # Initialize skill registry (resolve absolute skills path)
             try:
                 skills_dir = os.path.join(BASE_DIR, 'skills')
@@ -297,81 +327,78 @@ class Sebas:
                 skills_dir = 'skills'
             self.skill_registry = SkillRegistry(self, skills_dir=skills_dir)
             self.skill_registry.load_skill_preferences()
-        
-            # Phase 2: Initialize service and process managers
+
+            # Phase 2–6 как у тебя дальше (WindowsServiceManager, NetworkManager и прочее)
             try:
-                from integrations.windows_service_manager import WindowsServiceManager
-                from integrations.process_manager import ProcessManager
-                from integrations.network_manager import NetworkManager
-                from integrations.firewall_manager import FirewallManager
-                from integrations.port_monitor import PortMonitor
-                #from integrations.vpn_manager import VPNManager
-               
+                from sebas.integrations.windows_service_manager import WindowsServiceManager
+                from sebas.integrations.process_manager import ProcessManager
+                from sebas.integrations.network_manager import NetworkManager
+                from sebas.integrations.firewall_manager import FirewallManager
+                from sebas.integrations.port_monitor import PortMonitor
+                # from integrations.vpn_manager import VPNManager
+
                 if platform.system() == 'Windows':
                     self.service_manager = WindowsServiceManager()
                     self.process_manager = ProcessManager()
                     self.network_manager = NetworkManager()
                     self.firewall_manager = FirewallManager()
                     self.port_monitor = PortMonitor()
-                    #self.vpn_manager = VPNManager()
+                    # self.vpn_manager = VPNManager()
                 else:
                     self.service_manager = None
                     self.process_manager = None
                     self.network_manager = None
                     self.firewall_manager = None
                     self.port_monitor = None
-                    #self.vpn_manager = None
-                   
-                # Phase 3: Initialize file operations and storage managers
+                    # self.vpn_manager = None
+
                 if platform.system() == 'Windows':
-                    from integrations.file_operations import FileOperations
-                    from integrations.storage_manager import StorageManager
+                    from sebas.integrations.file_operations import FileOperations
+                    from sebas.integrations.storage_manager import StorageManager
                     self.file_operations = FileOperations()
                     self.storage_manager = StorageManager()
                 else:
                     self.file_operations = None
                     self.storage_manager = None
-               
-                # Phase 4: Initialize security and compliance managers
+
                 if platform.system() == 'Windows':
-                    from integrations.security_manager import SecurityManager
-                    from integrations.compliance_manager import ComplianceManager
+                    from sebas.integrations.security_manager import SecurityManager
+                    from sebas.integrations.compliance_manager import ComplianceManager
                     self.security_manager = SecurityManager()
                     self.compliance_manager = ComplianceManager()
                 else:
                     self.security_manager = None
                     self.compliance_manager = None
-               
-                # Phase 5: Initialize automation and enterprise integration managers
-                from integrations.automation_engine import AutomationEngine
-                from integrations.script_executor import ScriptExecutor
-                from integrations.event_system import EventSystem
-                from integrations.enterprise_integrations import DocumentationGenerator
+
+                from sebas.integrations.automation_engine import AutomationEngine
+                from sebas.integrations.script_executor import ScriptExecutor
+                from sebas.integrations.event_system import EventSystem
+                from sebas.integrations.enterprise_integrations import DocumentationGenerator
                 self.automation_engine = AutomationEngine()
                 self.script_executor = ScriptExecutor()
                 self.event_system = EventSystem()
                 self.doc_generator = DocumentationGenerator()
-               
+
                 if platform.system() == 'Windows':
-                    from integrations.task_scheduler import TaskScheduler
+                    from sebas.integrations.task_scheduler import TaskScheduler
                     self.task_scheduler = TaskScheduler()
                 else:
                     self.task_scheduler = None
-               
-                # Phase 6: Initialize AI analytics and NLU enhancement
-                from integrations.ai_analytics import (
+
+                from sebas.integrations.ai_analytics import (
                     AnomalyDetector, PredictiveAnalyzer,
                     PerformanceOptimizer, TroubleshootingGuide
                 )
-                from integrations.nlu_enhancer import (
-                    ContextManager, MultiPartCommandParser,
+                from sebas.integrations.nlu_enhancer import (
+                    ContextManager as EnhancedContextManager,
+                    MultiPartCommandParser,
                     LearningSystem, IntentResolver
                 )
                 self.anomaly_detector = AnomalyDetector()
                 self.predictive_analyzer = PredictiveAnalyzer()
                 self.performance_optimizer = PerformanceOptimizer()
                 self.troubleshooting_guide = TroubleshootingGuide()
-                self.nlu_context_manager = ContextManager()
+                self.nlu_context_manager = EnhancedContextManager()
                 self.multipart_parser = MultiPartCommandParser()
                 self.learning_system = LearningSystem()
                 self.intent_resolver = IntentResolver()
@@ -402,6 +429,7 @@ class Sebas:
                 self.intent_resolver = None
         except Exception:
             logging.exception("Failed to initialize premium modules")
+
        
         # Initialize Active Directory client (Phase 2) - after prefs is initialized
         try:
@@ -470,53 +498,48 @@ class Sebas:
             logging.exception("Microphone index selection failed")
             return None
     # ----------------------- TTS -----------------------
-    def speak(self, text, proactive=False):
+    def speak(self, text, proactive: bool = False):
         logging.info(f"Sebas speaking: {text}")
         try:
             try:
-                requests.post("http://127.0.0.1:5000/api/status", json={"processing": True}, timeout=0.25)
+                requests.post(
+                    "http://127.0.0.1:5000/api/status",
+                    json={"processing": True},
+                    timeout=0.25
+                )
             except Exception:
                 pass
+
             with self.audio_lock:
-                # Prefer ElevenLabs engine if configured, with fallback
-                lang = 'en'
+                lang = "en"
                 try:
-                    lm = getattr(self, 'language_manager', None)
+                    lm = getattr(self, "language_manager", None)
                     if lm is not None:
                         lang = lm.get_iso3()
                 except Exception:
                     pass
-                used_custom_engine = False
-                try:
-                    ve = getattr(self, 'voice_engine', None)
-                    if ve is not None:
-                        used_custom_engine = ve.speak(text, language=lang)
-                    else:
-                        used_custom_engine = False
-                except Exception:
-                    used_custom_engine = False
-                if not used_custom_engine:
-                    # Apply rate/volume from preferences before fallback TTS
+
+                ve = getattr(self, "tts_engine", None)
+                if ve is None:
+                    logging.error("TTS engine not initialized")
+                else:
                     try:
-                        rate = self.prefs.get_pref('tts_rate', None)
-                        if isinstance(rate, int):
-                            self.tts_engine.setProperty('rate', rate)
-                        volume = self.prefs.get_pref('tts_volume', None)
-                        if isinstance(volume, (int, float)):
-                            # pyttsx3 expects 0.0..1.0
-                            v = max(0.0, min(1.0, float(volume)))
-                            self.tts_engine.setProperty('volume', v)
+                        ve.speak(text, language=lang)
                     except Exception:
-                        pass
-                    self.tts_engine.speak(text)
+                        logging.exception("VoiceSystem.speak failed")
+                
             # For proactive suggestions, wait a bit for user response
             if proactive:
-                time.sleep(2) # Give user time to respond
+                time.sleep(2)
         except Exception:
-            logging.exception("TTS error")
+            logging.exception("TTS error in speak()")
         finally:
             try:
-                requests.post("http://127.0.0.1:5000/api/status", json={"processing": False}, timeout=0.25)
+                requests.post(
+                    "http://127.0.0.1:5000/api/status",
+                    json={"processing": False},
+                    timeout=0.25
+                )
             except Exception:
                 pass
     # ----------------------- Premium: Voice Control -----------------------
@@ -535,7 +558,6 @@ class Sebas:
         try:
             if not getattr(self, 'voice', None):
                 return False
-            self.voice.adjust(rate=rate, volume=volume, pitch_delta=pitch)
             self.speak("Voice settings updated")
             return True
         except Exception:
@@ -594,20 +616,19 @@ class Sebas:
             return None
     def list_available_voices(self):
         try:
-            voices = getattr(self, 'tts_engine', None)
-            if voices is None:
+            ve = getattr(self, "tts_engine", None)
+            if ve is None:
                 return []
-            voices_list = voices.getProperty('voices')
-            if not voices_list:
-                voices_list = []
+
+            voices_list = ve.get_voices() or []
             listed = []
             for v in voices_list:
                 info = {
-                    'id': getattr(v, 'id', ''),
-                    'name': getattr(v, 'name', ''),
-                    'languages': [str(x) for x in getattr(v, 'languages', [])],
-                    'age': getattr(v, 'age', ''),
-                    'gender': getattr(v, 'gender', ''),
+                    "id": getattr(v, "id", ""),
+                    "name": getattr(v, "name", ""),
+                    "languages": [str(x) for x in getattr(v, "languages", [])],
+                    "age": getattr(v, "age", ""),
+                    "gender": getattr(v, "gender", ""),
                 }
                 listed.append(info)
                 logging.debug(f"Voice: {info}")
@@ -615,82 +636,80 @@ class Sebas:
         except Exception:
             logging.exception("Failed to list voices")
             return []
+
     # Phase 1: Multilingual TTS selection by language/name
     def set_tts_language(self, language_hint: str) -> bool:
         try:
-            hint = (language_hint or '').lower().strip()
-            if not getattr(self, 'tts_engine', None):
+            hint = (language_hint or "").lower().strip()
+            ve = getattr(self, "tts_engine", None)
+            if not ve:
                 self.speak("TTS engine not initialized")
                 return False
-            voices_list = self.tts_engine.getProperty('voices')
+
+            voices_list = ve.get_voices()
             if not voices_list or not isinstance(voices_list, (list, tuple)):
                 voices_list = []
+
             def matches(v):
-                name = (getattr(v, 'name', '') or '').lower()
-                vid = (getattr(v, 'id', '') or '').lower()
-                langs = ' '.join([str(x).lower() for x in getattr(v, 'languages', [])])
+                name = (getattr(v, "name", "") or "").lower()
+                vid = (getattr(v, "id", "") or "").lower()
+                langs = " ".join([str(x).lower() for x in getattr(v, "languages", [])])
+                h = hint
                 return (
-                    hint in name or hint in vid or hint in langs or
-                    hint.replace('_', '-') in name or hint.replace('_', '-') in vid or hint.replace('_', '-') in langs
+                    h in name
+                    or h in vid
+                    or h in langs
+                    or h.replace("_", "-") in name
+                    or h.replace("_", "-") in vid
+                    or h.replace("_", "-") in langs
                 )
+
             candidates = [v for v in voices_list if matches(v)]
             selected = None
+
             if candidates:
                 for v in candidates:
-                    if any(k in (getattr(v, 'name', '') or '').lower() for k in ['uk', 'brit', 'en-gb', 'english (united kingdom)']):
+                    if any(
+                        k in (getattr(v, "name", "") or "").lower()
+                        for k in ["uk", "brit", "en-gb", "english (united kingdom)"]
+                    ):
                         selected = v
                         break
                 if not selected:
                     selected = candidates[0]
             else:
-                short = hint.split('-')[0]
+                short = hint.split("-")[0]
                 for v in voices_list:
-                    langs = ' '.join([str(x).lower() for x in getattr(v, 'languages', [])])
+                    langs = " ".join([str(x).lower() for x in getattr(v, "languages", [])])
                     if short and short in langs:
                         selected = v
                         break
+
             if not selected:
                 self.speak(f"I could not find a voice matching {language_hint}")
                 return False
-            voice_id = getattr(selected, 'id', None)
+
+            voice_id = getattr(selected, "id", None)
             if voice_id is None:
-                self.speak(f"Selected voice has no valid ID")
+                self.speak("Selected voice has no valid ID")
                 return False
-            self.tts_engine.setProperty('voice', voice_id)
+
+            ve.set_voice_id(voice_id)
             self.speak(f"Voice set to {getattr(selected, 'name', 'the selected voice')}")
             return True
         except Exception:
             logging.exception("Failed to set TTS language")
             return False
-    # def configure_butler_tts(self):
-    #     # Select best voice and set properties (rate, volume, pitch if supported)
-    #     try:
-    #         best_id = self._select_best_voice_id()
-    #         if best_id:
-    #             self.tts_engine.setProperty('voice', best_id)
-    #     except Exception:
-    #         logging.exception("Voice selection failed; continuing with default")
-    #     try:
-    #         self.tts_engine.setProperty('rate', 160)
-    #     except Exception:
-    #         pass
-    #     try:
-    #         self.tts_engine.setProperty('volume', 0.9)
-    #     except Exception:
-    #         pass
-    #     # Pitch support is driver-dependent; try common keys and ignore failures
-    #     self._pitch_supported = False
-    #     for key, val in [('pitch', -3), ('voice_pitch', -3), ('pitchPercent', 0.8)]:
-    #         try:
-    #             self.tts_engine.setProperty(key, val)
-    #             self._pitch_supported = True
-    #             break
-    #         except Exception:
-    #             continue
+
     def _select_best_voice_id(self):
-        voices_list = self.tts_engine.getProperty('voices')
+        ve = getattr(self, "tts_engine", None)
+        if not ve:
+            return None
+
+        voices_list = ve.get_voices()
         if not voices_list or not isinstance(voices_list, (list, tuple)):
             voices_list = []
+
         def score(v):
             name = (getattr(v, 'name', '') or '').lower()
             vid = (getattr(v, 'id', '') or '').lower()
@@ -705,17 +724,16 @@ class Sebas:
             # Known good voices
             if any(k in name for k in ['david', 'google uk english male']):
                 s += 25
-            if 'hazel' in name: # Hazel is British female (still acceptable)
+            if 'hazel' in name:
                 s += 10
-            # Tone hints
-            if any(k in name for k in ['baritone','bass','deep']):
+            if any(k in name for k in ['baritone', 'bass', 'deep']):
                 s += 12
-            if any(k in name for k in ['professional','pro','authority','authoritative']):
+            if any(k in name for k in ['professional', 'pro', 'authority', 'authoritative']):
                 s += 6
-            # Penalize clearly non-UK
             if 'us' in name or 'zira' in name or 'zira' in vid:
                 s -= 5
             return s
+
         best = None
         best_score = -10**9
         for v in voices_list:
@@ -723,8 +741,10 @@ class Sebas:
             if sc > best_score:
                 best = v
                 best_score = sc
-        logging.info(f"Selected voice: {getattr(best,'name','default')} (score={best_score})")
+
+        logging.info(f"Selected voice: {getattr(best, 'name', 'default')} (score={best_score})")
         return getattr(best, 'id', None)
+
     def test_butler_voice(self):
         phrases = [
             "At your command, sir. Sebas awaits your instructions.",
@@ -735,73 +755,106 @@ class Sebas:
         for p in phrases:
             self.speak(p)
     # ----------------------- Listening -----------------------
-    def listen(self, timeout=5, phrase_time_limit=10):
-        if self.microphone is None:
-            logging.warning("Microphone not available.")
-            return ""
-        try:
-            with self.audio_lock:
-                # Open mic lazily; fallback to default device if preferred index fails
-                try:
-                    source_cm = sr.Microphone(device_index=self.microphone_device_index)
-                except Exception:
-                    source_cm = sr.Microphone() # default device
-                with source_cm as source:
-                    if not hasattr(self, "_mic_calibrated"):
-                        # First listen calibration only
-                        if getattr(source, "stream", None):
-                            self.recognizer.adjust_for_ambient_noise(source, duration=1)
-                            self._mic_calibrated = True
+        def listen(self, timeout=5, phrase_time_limit=10):
+            if self.microphone is None:
+                logging.warning("Microphone not available.")
+                return ""
+
+            # ===== Capture audio =====
+            try:
+                with self.audio_lock:
                     try:
-                        requests.post("http://127.0.0.1:5000/api/status", json={"mic": "listening"}, timeout=0.25)
+                        source_cm = sr.Microphone(device_index=self.microphone_device_index)
                     except Exception:
-                        pass
-                    audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
-        except sr.WaitTimeoutError:
-            return ""
-        except Exception as e:
-            logging.exception(f"Error while listening: {e}")
-            return ""
-        try:
-            # send a neutral level to animate
+                        source_cm = sr.Microphone()
+
+                    with source_cm as source:
+                        if not hasattr(self, "_mic_calibrated"):
+                            if getattr(source, "stream", None):
+                                self.recognizer.adjust_for_ambient_noise(source, duration=1)
+                                self._mic_calibrated = True
+
+                        try:
+                            requests.post("http://127.0.0.1:5000/api/status",
+                                        json={"mic": "listening"}, timeout=0.25)
+                        except Exception:
+                            pass
+
+                        audio = self.recognizer.listen(
+                            source,
+                            timeout=timeout,
+                            phrase_time_limit=phrase_time_limit
+                        )
+
+            except sr.WaitTimeoutError:
+                return ""
+            except Exception as e:
+                logging.exception(f"Error while listening: {e}")
+                return ""
+
+            # ===== Recognition =====
             try:
-                requests.post("http://127.0.0.1:5000/api/level", json={"level": 0.2}, timeout=0.2)
-            except Exception:
-                pass
-            with self.audio_lock:
-                text = self.recognizer.recognize_vosk(audio).lower()
-            logging.debug(f"Recognized: {text}")
-            return text
-        except sr.UnknownValueError:
-            return ""
-        except sr.RequestError as e:
-            logging.error(f"Speech recognition service error: {e}")
-            self.speak("Speech recognition service unavailable")
-            return ""
-        except Exception as e:
-            logging.exception(f"Unexpected recognition error: {e}")
-            return ""
-        finally:
-            try:
-                requests.post("http://127.0.0.1:5000/api/status", json={"mic": "idle"}, timeout=0.25)
-            except Exception:
-                pass
+                try:
+                    requests.post("http://127.0.0.1:5000/api/level",
+                                json={"level": 0.2}, timeout=0.2)
+                except Exception:
+                    pass
+
+                text = ""
+
+                with self.audio_lock:
+                    # Try Vosk first
+                    try:
+                        text = self.recognizer.recognize_vosk(audio).lower()
+                    except Exception:
+                        # Google fallback safely
+                        if hasattr(self.recognizer, "recognize_google"):
+                            google_recognizer = getattr(self.recognizer, "recognize_google")
+                            try:
+                                text = google_recognizer(audio).lower()
+                            except sr.UnknownValueError:
+                                return ""
+                            except sr.RequestError as e:
+                                logging.error(f"Speech recognition service error: {e}")
+                                self.speak("Speech recognition service unavailable")
+                                return ""
+                        else:
+                            logging.error("Google recognition is not available.")
+                            return ""
+
+                logging.debug(f"Recognized: {text}")
+                return text
+
+            except Exception as e:
+                logging.exception(f"Unexpected recognition error: {e}")
+                return ""
+
+            finally:
+                try:
+                    requests.post("http://127.0.0.1:5000/api/status",
+                                json={"mic": "idle"}, timeout=0.25)
+                except Exception:
+                    pass
+
     # ----------------------- Command Parsing -----------------------
     @safe_call(log_message="Error executing command", speak_message=None)
     def parse_and_execute(self, command):
         raw_command = (command or "").strip()
-        # Auto-detect language from raw input (don't force lowercase for detection)
+
+        # Авто-детект языка (без lower)
         try:
             lm = getattr(self, 'language_manager', None)
             if lm is not None:
                 lm.detect_language(raw_command)
         except Exception:
             pass
+
         command = raw_command.lower()
         if not command:
             logging.warning("Empty command received")
             return
-        # Quick language switch command: "language <name/code>" or "set language <name/code>"
+
+        # Быстрая смена языка: "language xx" / "set language xx"
         try:
             if command.startswith('language ') or command.startswith('set language'):
                 arg = command
@@ -817,167 +870,205 @@ class Sebas:
                 return
         except Exception:
             logging.exception("Language switch handling failed")
-       
+
         logging.info(f"parse_and_execute called with command: '{command}'")
-        # Optional polish: allow "service <app>" as synonym for "open <app>"
+
+        # "service ..." → синтаксический сахар для open
         try:
             if command.startswith('service '):
                 service_cmd = command[len('service '):].strip()
                 if service_cmd.startswith('open '):
-                    # "service open <app>" -> "open <app>"
                     command = 'open ' + service_cmd[len('open '):].strip()
                 elif len(service_cmd) == 0 or service_cmd == 'open':
-                    # Incomplete "service open" - prompt for app
                     self.speak("What application would you like to open?")
                     app_name = self.listen(timeout=5)
                     if app_name:
                         command = f"open {app_name}"
                     else:
-                        return  # Cancelled
+                        return
                 else:
-                    # "service <app>" -> "open <app>"
                     command = 'open ' + service_cmd
         except Exception:
-            pass
-            # Enhanced NLU pass with confidence scoring and fallback
-            intent = None
-            # Default to the raw command for permission checks if NLU fails
-            intent_name_for_check = command
-            suggestions = []
-            try:
-                if getattr(self, 'nlu', None):
-                    logging.debug(f"Trying NLU for command: {command}")
-                    intent, suggestions = self.nlu.get_intent_with_confidence(command)
-                    if intent:
-                        logging.info(f"NLU found intent: {intent.name} with confidence {intent.confidence}")
-                    else:
-                        logging.debug("NLU did not find intent")
+            logging.exception("Service alias handling failed")
+
+        # ---------- NLU БЛОК (вынесен из except!) ----------
+        intent = None
+        intent_name_for_check = command
+        suggestions = []
+
+        try:
+            nlu = getattr(self, 'nlu', None)
+            if nlu:
+                logging.debug(f"Trying NLU for command: {command}")
+
+                # Совместимость с разными версиями NLU
+                if hasattr(nlu, "get_intent_with_confidence"):
+                    intent, suggestions = nlu.get_intent_with_confidence(command)
+                elif hasattr(nlu, "parse"):
+                    parsed = nlu.parse(command)
+                    if parsed:
+                        class _Wrap:
+                            def __init__(self):
+                                self.name: str = ""
+                                self.slots: dict = {}
+                                self.confidence: float = 1.0
+                                self.fuzzy_match = None
+                            pass
+                        intent = _Wrap()
+                        intent.name = parsed.name
+                        intent.slots = getattr(parsed, "slots", {}) or {}
+                        intent.confidence = 1.0
+                        intent.fuzzy_match = None
+                        suggestions = []
                 else:
-                    logging.warning("NLU module not available")
-            except Exception as e:
-                logging.debug(f"NLU parse failed: {e}", exc_info=True)
-                intent = None
-            if intent:
-                intent_name_for_check = intent.name
-                self.context.add({"type": "intent", "name": intent.name, "slots": intent.slots, "confidence": intent.confidence})
-                # Provide confidence feedback for low confidence matches
-                if intent.confidence < 0.8:
+                    logging.warning("NLU object has no known interface")
+
+                if intent:
+                    logging.info(f"NLU found intent: {getattr(intent, 'name', '?')} with confidence {getattr(intent, 'confidence', 1.0)}")
+                else:
+                    logging.debug("NLU did not find intent")
+            else:
+                logging.warning("NLU module not available")
+        except Exception as e:
+            logging.debug(f"NLU parse failed: {e}", exc_info=True)
+            intent = None
+
+        if intent:
+            intent_name_for_check = intent.name
+            try:
+                self.context.add({
+                    "type": "intent",
+                    "name": intent.name,
+                    "slots": getattr(intent, "slots", {}),
+                    "confidence": getattr(intent, "confidence", 1.0)
+                })
+            except Exception:
+                pass
+
+            # Сообщение при низкой уверенности
+            try:
+                if getattr(intent, "confidence", 1.0) < 0.8:
                     confidence_msg = f"I detected '{intent.name}' with {intent.confidence:.1%} confidence."
                     if getattr(intent, 'fuzzy_match', None):
                         confidence_msg += f" Did you mean '{intent.fuzzy_match}'?"
                     self.speak(confidence_msg)
-                    # Brief pause for user confirmation
-                    import time
                     time.sleep(0.5)
-                # *** PERMISSION CHECK ***
-                if not self.has_permission(intent.name):
-                    logging.warning(f"Permission denied for intent: {intent.name}")
-                    return
-                # Fix-up for cases where NLU extracted a too-short app name (e.g., 'm')
-                try:
-                    if intent.name in ("open_app_with_context", "open_application"):
-                        app_slot = (intent.slots or {}).get('app_name') or (intent.slots or {}).get('application')
-                        if not app_slot or len((app_slot or '').strip()) < 2:
-                            import re as _re
-                            m = _re.search(r"\bopen\s+(.+?)(?:\s+and\s+.+)?$", command)
-                            if m:
-                                fixed_app = m.group(1).strip().strip('"')
-                                if fixed_app:
-                                    intent.slots['app_name'] = fixed_app
-                                    logging.info(f"Fixed app name slot to: {fixed_app}")
-                except Exception:
-                    pass
-                # Try skills first
-                logging.debug(f"Trying skills for intent: {intent.name}")
-                handled = self.skill_registry.handle_intent(intent.name, intent.slots)
-                if handled:
-                    logging.info(f"Skill handled intent: {intent.name}")
-                    return
-                else:
-                    logging.debug(f"No skill handled intent: {intent.name}")
-               
-                # Fallback to legacy intent handling
-                logging.debug(f"Trying legacy handler for intent: {intent.name}")
-                handled = self._handle_intent(intent.name, intent.slots)
-                if handled:
-                    logging.info(f"Legacy handler handled intent: {intent.name}")
-                    return
-                else:
-                    logging.debug(f"Legacy handler did not handle intent: {intent.name}")
-            # --- NEW: Explicit open-application parsing (handles "open <app>" and "service open <app>") ---
-            try:
-                import re as _re
-                open_match = _re.search(r'(?:open|launch)\s+(.+)', command, _re.I)
-                if open_match:
-                    app_name = (open_match.group(1) or '').strip().strip('"')
-                    # Special-case: if user said "service open <app>", strip the leading token
-                    sub_match = _re.search(r'^service\s+open\s+(.+)', command, _re.I)
-                    if sub_match:
-                        app_name = (sub_match.group(1) or '').strip().strip('"')
-                    if app_name:
-                        self.open_application(app_name)
-                        return
-                    else:
-                        self.speak("Please specify an application after 'open'.")
-                        return
             except Exception:
                 pass
-            # --- END NEW BLOCK ---
-            # Learned commands take precedence if exact or contained match
-            handled = self._try_handle_learned_command(command)
-            if handled:
+
+            if not self.has_permission(intent.name):
+                logging.warning(f"Permission denied for intent: {intent.name}")
                 return
-            # Try fallback commands using skills (for commands not handled by NLU)
-            # Permission check for fallback commands
-            logging.debug(f"Trying fallback handling for command: {command}")
-            fallback_intent, _ = self._extract_intent_from_command(command)
-            if fallback_intent:
-                logging.debug(f"Extracted fallback intent: {fallback_intent}")
-                if not self.has_permission(fallback_intent):
-                    logging.warning(f"Permission denied for fallback intent: {fallback_intent}")
+
+            # Фикс кривого app_name у NLU
+            try:
+                if intent.name in ("open_app_with_context", "open_application"):
+                    slots = getattr(intent, "slots", {}) or {}
+                    app_slot = slots.get('app_name') or slots.get('application')
+                    if not app_slot or len((app_slot or '').strip()) < 2:
+                        import re as _re
+                        m = _re.search(r"\bopen\s+(.+?)(?:\s+and\s+.+)?$", command)
+                        if m:
+                            fixed_app = m.group(1).strip().strip('"')
+                            if fixed_app:
+                                slots['app_name'] = fixed_app
+                                intent.slots = slots
+                                logging.info(f"Fixed app name slot to: {fixed_app}")
+            except Exception:
+                pass
+
+            # Сначала пробуем skills
+            try:
+                logging.debug(f"Trying skills for intent: {intent.name}")
+                handled = self.skill_registry.handle_intent(intent.name, getattr(intent, "slots", {}) or {})
+            except Exception:
+                handled = False
+
+            if handled:
+                logging.info(f"Skill handled intent: {intent.name}")
+                return
+
+            # Потом legacy intent handler
+            logging.debug(f"Trying legacy handler for intent: {intent.name}")
+            handled = self._handle_intent(intent.name, getattr(intent, "slots", {}) or {})
+            if handled:
+                logging.info(f"Legacy handler handled intent: {intent.name}")
+                return
+
+        # ---------- Если NLU не сработал ----------
+
+        # Явный разбор "open <app>"
+        try:
+            import re as _re
+            open_match = _re.search(r'(?:open|launch)\s+(.+)', command, _re.I)
+            if open_match:
+                app_name = (open_match.group(1) or '').strip().strip('"')
+                sub_match = _re.search(r'^service\s+open\s+(.+)', command, _re.I)
+                if sub_match:
+                    app_name = (sub_match.group(1) or '').strip().strip('"')
+                if app_name:
+                    self.open_application(app_name)
                     return
-            handled = self._handle_fallback_with_skills(command)
-            if handled:
-                logging.info(f"Fallback handling succeeded for: {command}")
+                else:
+                    self.speak("Please specify an application after 'open'.")
+                    return
+        except Exception:
+            pass
+
+        # Learned commands
+        handled = self._try_handle_learned_command(command)
+        if handled:
+            return
+
+        # Fallback через skills
+        logging.debug(f"Trying fallback handling for command: {command}")
+        fallback_intent, _ = self._extract_intent_from_command(command)
+        if fallback_intent:
+            logging.debug(f"Extracted fallback intent: {fallback_intent}")
+            if not self.has_permission(fallback_intent):
+                logging.warning(f"Permission denied for fallback intent: {fallback_intent}")
                 return
-            else:
-                logging.debug(f"Fallback handling did not handle: {command}")
-            # Try legacy command handlers
-            if command.startswith("learn ") or command.startswith("teach ") or "learn command" in command:
-                self._handle_learn_intent(command)
-                return
-            elif command.startswith("forget ") or "forget command" in command or "remove command" in command:
-                self._handle_forget_intent(command)
-                return
-            elif "list learned" in command or "learned commands" in command:
-                self._handle_list_learned()
-                return
-            elif "create a note" in command:
-                note = command.split("create a note")[-1].strip()
-                self.create_note(note)
-                return
-            elif "take a screenshot" in command or "screenshot" in command:
-                self.take_screenshot()
-                return
-            elif "ip address" in command:
-                self.get_ip_address()
-                return
-            elif "speed test" in command:
-                self.run_speed_test()
-                return
-           
-            # Fallback to legacy commands
-            legacy_handled = self._handle_legacy_commands(command)
-            if legacy_handled:
-                return
-           
-            # Enhanced fallback handling with suggestions
-            if suggestions:
-                suggestion_text = "I didn't understand that command. Did you mean: " + ", or ".join(suggestions)
-                self.speak(suggestion_text)
-            else:
-                self.speak("I beg your pardon; I did not quite catch the instruction, " + self.get_salutation() + ". Try saying 'help' for available commands.")
-                logging.warning(f"Command not handled: '{command}'")
+        handled = self._handle_fallback_with_skills(command)
+        if handled:
+            logging.info(f"Fallback handling succeeded for: {command}")
+            return
+
+        # Legacy команды
+        if command.startswith("learn ") or command.startswith("teach ") or "learn command" in command:
+            self._handle_learn_intent(command)
+            return
+        elif command.startswith("forget ") or "forget command" in command or "remove command" in command:
+            self._handle_forget_intent(command)
+            return
+        elif "list learned" in command or "learned commands" in command:
+            self._handle_list_learned()
+            return
+        elif "create a note" in command:
+            note = command.split("create a note")[-1].strip()
+            self.create_note(note)
+            return
+        elif "take a screenshot" in command or "screenshot" in command:
+            self.take_screenshot()
+            return
+        elif "ip address" in command:
+            self.get_ip_address()
+            return
+        elif "speed test" in command:
+            self.run_speed_test()
+            return
+
+        legacy_handled = self._handle_legacy_commands(command)
+        if legacy_handled:
+            return
+
+        # Сообщение, если вообще ничего не поняли
+        if suggestions:
+            suggestion_text = "I didn't understand that command. Did you mean: " + ", or ".join(suggestions)
+            self.speak(suggestion_text)
+        else:
+            self.speak("I beg your pardon; I did not quite catch the instruction, " + self.get_salutation() + ". Try saying 'help' for available commands.")
+            logging.warning(f"Command not handled: '{command}'")
+
         
     def _handle_legacy_commands(self, command):
         """Handle old-style direct commands for backward compatibility, with permission checks."""
@@ -994,7 +1085,7 @@ class Sebas:
     def _initialize_ad_client(self):
         """Initialize Active Directory client from preferences."""
         try:
-            from integrations.ad_client import ADClient
+            from sebas.integrations.ad_client import ADClient
            
             ad_config = self.prefs.get_ad_config()
             if not ad_config.get('enabled', False):
@@ -2292,7 +2383,7 @@ if __name__ == "__main__":
     assistant = Sebas()
     # Start UI server
     try:
-        from api.ui_server import start_ui_server
+        from sebas.api.ui_server import start_ui_server
         start_ui_server()
         try:
             _web.open("http://127.0.0.1:5000/", new=1)
@@ -2303,7 +2394,7 @@ if __name__ == "__main__":
    
     # Start API server (Phase 1.3)
     try:
-        from api.api_server import APIServer, create_api_server
+        from sebas.api.api_server import APIServer, create_api_server
         api_server = create_api_server(sebas_instance=assistant, host="127.0.0.1", port=5002)
         api_server.start()
         logging.info("SEBAS API server started on http://127.0.0.1:5002")
@@ -2361,14 +2452,3 @@ if __name__ == "__main__":
             assistant.tts_engine.stop()
         except Exception:
             pass
-    def start_sebas():
-        """Entry point for SEBAS launcher."""
-    from sebas.api.api_server import create_api_server
-    import logging
-
-    logging.info("Starting SEBAS Assistant...")
-    server = create_api_server()
-    server.start()
-
-    logging.info("SEBAS Assistant is running.")
-       

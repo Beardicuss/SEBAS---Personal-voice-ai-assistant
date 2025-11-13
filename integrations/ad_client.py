@@ -8,7 +8,7 @@ import logging
 import os
 import platform
 from typing import Optional, Dict, List, Tuple, Any
-from constants.permissions import Role
+from sebas.constants.permissions import Role
 
 # Try to import LDAP3 for LDAP operations
 try:

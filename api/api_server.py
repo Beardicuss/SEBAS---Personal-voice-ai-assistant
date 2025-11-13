@@ -37,7 +37,7 @@ from .websocket import (
     init_websocket_manager,
     get_websocket_manager as websock,
 )
-from services.nlu import SimpleNLU
+from sebas.services.nlu import SimpleNLU
 
 
 class APIServer:
