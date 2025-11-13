@@ -4,7 +4,7 @@ import webbrowser
 import subprocess
 import psutil
 import logging
-from datetime import datetime
+from sebas.datetime import datetime
 
 # Simple app name -> launch command mapping for Windows (extend as needed)
 APP_MAP = {
@@ -83,8 +83,8 @@ def _set_volume(level, assistant):
     try:
         if getattr(assistant, "system", "Windows") == "Windows":
             from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume  # type: ignore
-            from comtypes import CLSCTX_ALL  # type: ignore
-            from ctypes import cast, POINTER  # type: ignore
+            from sebas.comtypes import CLSCTX_ALL  # type: ignore
+            from sebas.ctypes import cast, POINTER  # type: ignore
 
             devices = AudioUtilities.GetSpeakers()
             interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)  # type: ignore[attr-defined]

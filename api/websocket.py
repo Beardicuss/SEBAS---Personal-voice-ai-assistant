@@ -7,16 +7,16 @@ Phase 1.3.5: Real-time communication
 import json
 import logging
 import threading
-from typing import Dict, Set, Callable, Optional, Any
-from enum import Enum
+from sebas.typing import Dict, Set, Callable, Optional, Any
+from sebas.enum import Enum
 
 # Optional WebSocket support
 try:
-    from flask_socketio import SocketIO, emit, join_room, leave_room
+    from sebas.flask_socketio import SocketIO, emit, join_room, leave_room
     WEBSOCKET_AVAILABLE = True
 except ImportError:
     try:
-        from flask_socketio import SocketIO, emit, join_room, leave_room
+        from sebas.flask_socketio import SocketIO, emit, join_room, leave_room
         WEBSOCKET_AVAILABLE = True
     except ImportError:
         WEBSOCKET_AVAILABLE = False

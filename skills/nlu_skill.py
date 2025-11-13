@@ -4,8 +4,8 @@ Enhanced NLU Skill
 Phase 6.2: Context-aware command execution and learning
 """
 
-from skills.base_skill import BaseSkill
-from typing import Dict, Any
+from sebas.skills.base_skill import BaseSkill
+from sebas.typing import Dict, Any
 import logging
 
 
@@ -40,7 +40,7 @@ class NLUSkill(BaseSkill):
     def _init_nlu(self):
         """Initialize NLU components."""
         try:
-            from integrations.nlu_enhancer import (
+            from sebas.integrations.nlu_enhancer import (
                 ContextManager, MultiPartCommandParser,
                 LearningSystem, IntentResolver
             )

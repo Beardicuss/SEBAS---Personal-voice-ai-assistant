@@ -7,9 +7,9 @@ Phase 5.1: Event-driven automation triggers (improved version)
 import logging
 import threading
 import json
-from typing import Dict, List, Callable, Optional, Any
-from datetime import datetime
-from enum import Enum
+from sebas.typing import Dict, List, Callable, Optional, Any
+from sebas.datetime import datetime
+from sebas.enum import Enum
 
 
 class EventType(Enum):

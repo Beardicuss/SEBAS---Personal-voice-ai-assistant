@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from typing import List, Dict
-from datetime import datetime
+from sebas.typing import List, Dict
+from sebas.datetime import datetime
 
 
 class SuggestionEngine:
@@ -22,4 +22,3 @@ class SuggestionEngine:
             if last_cmd and "speed test" in last_cmd:
                 out.append({"type": "network", "text": "Network was slow earlier. Do you want me to check again?"})
         return out[:3]
-

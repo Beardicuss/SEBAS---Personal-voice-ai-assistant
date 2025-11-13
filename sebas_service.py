@@ -30,8 +30,8 @@ import win32serviceutil
 import win32service
 import win32event
 import servicemanager
-from datetime import datetime
-from typing import Dict, Any  # Added to resolve undefined type hints
+from sebas.datetime import datetime
+from sebas.typing import Dict, Any  # Added to resolve undefined type hints
 
 HOST = '127.0.0.1'
 PORT = 5001  # Port for the service to listen on

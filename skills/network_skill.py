@@ -4,8 +4,8 @@ Network Management Skill
 Phase 2.2: Network administration
 """
 
-from skills.base_skill import BaseSkill
-from typing import Dict, Any
+from sebas.skills.base_skill import BaseSkill
+from sebas.typing import Dict, Any
 import logging
 
 
@@ -139,7 +139,7 @@ class NetworkSkill(BaseSkill):
                 self.assistant.speak("Please specify an interface name")
                 return False
             
-            from integrations.network_manager import IPConfigType
+            from sebas.integrations.network_manager import IPConfigType
             try:
                 config_type = IPConfigType(config_type_str.lower())
             except ValueError:
@@ -456,7 +456,7 @@ class NetworkSkill(BaseSkill):
                 self.assistant.speak("Please specify a rule name")
                 return False
             
-            from integrations.firewall_manager import (
+            from sebas.integrations.firewall_manager import (
                 FirewallRuleDirection, FirewallRuleAction, FirewallRuleProtocol
             )
             

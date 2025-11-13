@@ -3,8 +3,8 @@
 Base Skill Class for SEBAS Skills System
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional
+from sebas.abc import ABC, abstractmethod
+from sebas.typing import Dict, List, Any, Optional
 import logging
 
 

@@ -9,8 +9,8 @@ import subprocess
 import platform
 import os
 import sys
-from typing import Optional, Dict, Tuple, List
-from pathlib import Path
+from sebas.typing import Optional, Dict, Tuple, List
+from sebas.pathlib import Path
 import tempfile
 
 

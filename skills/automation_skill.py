@@ -4,18 +4,18 @@ Automation Skill
 Phase 5.1: Workflow automation and script execution
 """
 
-from skills.base_skill import BaseSkill
-from typing import Dict, Any
+from sebas.skills.base_skill import BaseSkill
+from sebas.typing import Dict, Any
 import logging
 import platform
-from datetime import datetime, timedelta
-from integrations.email_client import EmailClient, fetch_email_summaries
+from sebas.datetime import datetime, timedelta
+from sebas.integrations.email_client import EmailClient, fetch_email_summaries
 client = EmailClient()
 print(client.send_mail("me@domain.com", "Test", "Hello"))
 print(fetch_email_summaries(2))
-from integrations.ms_graph_auth import get_access_token
+from sebas.integrations.ms_graph_auth import get_access_token
 print(get_access_token())
-from integrations.enterprise_integrations import JiraIntegration, DocumentationGenerator
+from sebas.integrations.enterprise_integrations import JiraIntegration, DocumentationGenerator
 
 jira = JiraIntegration("https://fake.atlassian.net", "user", "token")
 ok, resp = jira.create_ticket("Test", "This is a test")
@@ -23,7 +23,7 @@ print(ok, resp)
 
 docs = DocumentationGenerator().generate_configuration_documentation({"debug": True, "version": "1.0"})
 print(docs[:200])
-from integrations.event_system import EventSystem, EventType
+from sebas.integrations.event_system import EventSystem, EventType
 
 sys = EventSystem()
 
@@ -33,7 +33,7 @@ def printer(event):
 sys.subscribe(EventType.CUSTOM, printer)
 sys.publish_event(EventType.CUSTOM, "TestModule", {"hello": "world"})
 
-from integrations.firewall_manager import FirewallManager, FirewallRuleDirection, FirewallRuleAction, FirewallRuleProtocol
+from sebas.integrations.firewall_manager import FirewallManager, FirewallRuleDirection, FirewallRuleAction, FirewallRuleProtocol
 
 fw = FirewallManager()
 ok, msg = fw.create_firewall_rule("TestRule", FirewallRuleDirection.INBOUND, FirewallRuleAction.ALLOW, FirewallRuleProtocol.TCP, local_port=8080)
@@ -89,9 +89,9 @@ class AutomationSkill(BaseSkill):
     def _init_managers(self):
         """Initialize automation managers."""
         try:
-            from integrations.automation_engine import AutomationEngine
-            from integrations.script_executor import ScriptExecutor
-            from integrations.task_scheduler import TaskScheduler
+            from sebas.integrations.automation_engine import AutomationEngine
+            from sebas.integrations.script_executor import ScriptExecutor
+            from sebas.integrations.task_scheduler import TaskScheduler
             self.automation_engine = AutomationEngine()
             self.script_executor = ScriptExecutor()
             self.task_scheduler = TaskScheduler() if platform.system() == 'Windows' else None
@@ -358,7 +358,7 @@ class AutomationSkill(BaseSkill):
                 self.assistant.speak("Please specify task name and command")
                 return False
 
-            from integrations.task_scheduler import TaskTriggerType
+            from sebas.integrations.task_scheduler import TaskTriggerType
             trigger_type = TaskTriggerType.DAILY  # Default
 
             success, message = self.task_scheduler.create_task(
@@ -582,7 +582,7 @@ class AutomationSkill(BaseSkill):
     def _handle_read_emails(self, slots: dict) -> bool:
         try:
             limit = int(slots.get('limit', 5))
-            from integrations.email_client import fetch_email_summaries
+            from sebas.integrations.email_client import fetch_email_summaries
             ok, items = fetch_email_summaries(limit=limit)
             if not ok:
                 self.assistant.speak(items[0].get('error', 'Failed to read emails'))
@@ -607,7 +607,7 @@ class AutomationSkill(BaseSkill):
             if not to_addr or not subject or not body:
                 self.assistant.speak("Please specify recipient, subject, and message")
                 return False
-            from integrations.email_client import send_email
+            from sebas.integrations.email_client import send_email
             ok, msg = send_email(to_addr, subject, body)
             self.assistant.speak(msg)
             return ok
@@ -640,7 +640,7 @@ class AutomationSkill(BaseSkill):
             if not title or not start_iso or not end_iso:
                 self.assistant.speak("Please specify title, start, and end time")
                 return False
-            from integrations.calendar_client import CalendarClient
+            from sebas.integrations.calendar_client import CalendarClient
             client = CalendarClient()
             ok, msg = client.add_event(provider, title, start_iso, end_iso, description)
             self.assistant.speak(msg)
@@ -813,7 +813,7 @@ class AutomationSkill(BaseSkill):
             if not start_iso or not end_iso:
                 self.assistant.speak("Please specify start and end time window")
                 return False
-            from integrations.calendar_client import list_events
+            from sebas.integrations.calendar_client import list_events
             ok, items = list_events(provider, start_iso, end_iso, top)
             if not ok:
                 err = items[0].get('error', 'Failed to list events') if items else 'Failed to list events'
@@ -848,7 +848,7 @@ class AutomationSkill(BaseSkill):
             start_iso = slots.get('start_iso')
             end_iso = slots.get('end_iso')
             description = slots.get('description')
-            from integrations.calendar_client import update_event
+            from sebas.integrations.calendar_client import update_event
             ok, msg = update_event(provider, event_id, title, start_iso, end_iso, description)
             self.assistant.speak(msg)
             return ok
@@ -866,7 +866,7 @@ class AutomationSkill(BaseSkill):
                 return False
             if not self.assistant.confirm_action(f"Delete event {event_id}?"):
                 return True
-            from integrations.calendar_client import delete_event
+            from sebas.integrations.calendar_client import delete_event
             ok, msg = delete_event(provider, event_id)
             self.assistant.speak(msg)
             return ok

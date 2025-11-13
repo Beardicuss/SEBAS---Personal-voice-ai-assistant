@@ -3,8 +3,8 @@
 File Skill - Handles file operations like create, search, open with advanced features
 """
 
-from skills.base_skill import BaseSkill
-from typing import Dict, List, Any, Optional, Tuple
+from sebas.skills.base_skill import BaseSkill
+from sebas.typing import Dict, List, Any, Optional, Tuple
 import logging
 import os
 import shutil
@@ -12,8 +12,8 @@ import time
 import json
 import threading
 import mimetypes
-from pathlib import Path
-from datetime import datetime, timedelta
+from sebas.pathlib import Path
+from sebas.datetime import datetime, timedelta
 import fnmatch
 try:
     import win32api
@@ -784,7 +784,7 @@ class FileSkill(BaseSkill):
                 archive = os.path.join(os.path.dirname(source), f"{base}.zip")
             if not hasattr(self, 'file_ops') or self.file_ops is None:
                 try:
-                    from integrations.file_operations import FileOperations
+                    from sebas.integrations.file_operations import FileOperations
                     self.file_ops = FileOperations()
                 except Exception:
                     self.assistant.speak("Compression utilities not available")
@@ -811,7 +811,7 @@ class FileSkill(BaseSkill):
                 return False
             if not hasattr(self, 'file_ops') or self.file_ops is None:
                 try:
-                    from integrations.file_operations import FileOperations
+                    from sebas.integrations.file_operations import FileOperations
                     self.file_ops = FileOperations()
                 except Exception:
                     self.assistant.speak("Extraction utilities not available")
@@ -837,7 +837,7 @@ class FileSkill(BaseSkill):
                 self.assistant.speak("Please specify provider and path")
                 return False
             try:
-                from integrations.cloud_sync import CloudSync
+                from sebas.integrations.cloud_sync import CloudSync
             except Exception:
                 self.assistant.speak("Cloud sync not available in this build")
                 return False

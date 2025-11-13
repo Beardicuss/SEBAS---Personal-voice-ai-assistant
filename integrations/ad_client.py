@@ -7,12 +7,12 @@ Phase 2: Active Directory Integration
 import logging
 import os
 import platform
-from typing import Optional, Dict, List, Tuple, Any
+from sebas.typing import Optional, Dict, List, Tuple, Any
 from sebas.constants.permissions import Role
 
 # Try to import LDAP3 for LDAP operations
 try:
-    from ldap3 import Server, Connection, ALL, NTLM, SIMPLE, SUBTREE
+    from sebas.ldap3 import Server, Connection, ALL, NTLM, SIMPLE, SUBTREE
     LDAP3_AVAILABLE = True
 except ImportError:
     LDAP3_AVAILABLE = False
@@ -222,4 +222,3 @@ class ADClient:
         except Exception:
             logging.exception(f"Failed to lookup user: {username}")
             return None
-

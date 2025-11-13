@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from sebas.typing import Optional
 
 from .voice_engine_piper import PiperVoiceEngine
 from .voice_manager import VoiceManager

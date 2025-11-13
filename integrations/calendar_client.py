@@ -7,8 +7,8 @@ Supports Microsoft Graph Calendar and scaffolding for Google Calendar.
 import logging
 import os
 import requests
-from datetime import datetime, timedelta
-from typing import Optional, Tuple, List, Dict, Any
+from sebas.datetime import datetime, timedelta
+from sebas.typing import Optional, Tuple, List, Dict, Any
 
 
 class CalendarClient:
@@ -38,7 +38,7 @@ class CalendarClient:
             token = os.environ.get('MS_GRAPH_TOKEN')
             if not token:
                 try:
-                    from integrations.ms_graph_auth import get_access_token
+                    from sebas.integrations.ms_graph_auth import get_access_token
                     ok, tok = get_access_token(scopes=['Calendars.ReadWrite', 'offline_access'])
                     if not ok or not tok:
                         return False, "Microsoft Graph not configured"
@@ -94,7 +94,7 @@ def _ensure_token(scopes: List[str]) -> Tuple[bool, Optional[str]]:
     if token:
         return True, token
     try:
-        from integrations.ms_graph_auth import get_access_token
+        from sebas.integrations.ms_graph_auth import get_access_token
         ok, tok = get_access_token(scopes=scopes)
         if ok and tok:
             return True, tok

@@ -1,74 +1,129 @@
+"""
+SEBAS Structure Repair v2
+Works from ANY location. Autodetects project structure.
+"""
+
 import os
-import re
-import shutil
-from pathlib import Path
+import sys
+from sebas.pathlib import Path
 
-# --- CONFIG ---
-OLD_NAME = "SEBAS - Personal Voice AI Assistant"
-NEW_NAME = "sebas"
-PACKAGE_ROOT = Path(__file__).parent / NEW_NAME
+print("\n========== SEBAS STRUCTURE REPAIR ==========\n")
 
-# --- 1. Rename root folder if necessary ---
-old_path = Path(__file__).parent / OLD_NAME
-if old_path.exists() and not PACKAGE_ROOT.exists():
-    print(f"[+] Renaming root folder: {OLD_NAME} -> {NEW_NAME}")
-    shutil.move(str(old_path), str(PACKAGE_ROOT))
-elif not PACKAGE_ROOT.exists():
-    print(f"[!] Could not find {OLD_NAME}. Ensure script is in the correct directory.")
-else:
-    print("[=] Package folder already correctly named 'sebas'")
+# ---------------------------------------
+# 1. Определение корня проекта
+# ---------------------------------------
 
-# --- 2. Ensure __init__.py exists in all relevant subfolders ---
-target_dirs = [
-    PACKAGE_ROOT,
-    PACKAGE_ROOT / "api",
-    PACKAGE_ROOT / "skills",
-    PACKAGE_ROOT / "services",
-    PACKAGE_ROOT / "integrations",
-    PACKAGE_ROOT / "logging_conf",
-    PACKAGE_ROOT / "ui",
+def find_project_root(start: Path) -> Path | None:
+    """
+    Ищем папку sebas в текущей директории.
+    Если найдено: возвращаем текущую директорию как корень проекта.
+    """
+    for p in start.iterdir():
+        if p.is_dir() and p.name.lower() == "sebas":
+            return start
+    return None
+
+
+# Точка запуска скрипта
+start_dir = Path.cwd()
+root = find_project_root(start_dir)
+
+if root is None:
+    print("[❌] ERROR: Can't find 'sebas' folder in:")
+    print(f"    {start_dir}")
+    print("    Run script from directory containing 'sebas'.")
+    sys.exit(1)
+
+print(f"[✔] Project root detected: {root}")
+
+PACKAGE = root / "sebas"
+
+# ---------------------------------------
+# 2. Обязательные подпапки
+# ---------------------------------------
+mandatory_dirs = [
+    PACKAGE,
+    PACKAGE / "api",
+    PACKAGE / "services",
+    PACKAGE / "skills",
+    PACKAGE / "integrations",
+    PACKAGE / "constants",
+    PACKAGE / "permissions",
+    PACKAGE / "nlp",
+    PACKAGE / "wakeword",
+    PACKAGE / "ui",
+    PACKAGE / "logging_conf",
+    PACKAGE / "tools",
 ]
-for d in target_dirs:
+
+print("\n[+] Ensuring project directories...")
+
+for d in mandatory_dirs:
     d.mkdir(parents=True, exist_ok=True)
     init_file = d / "__init__.py"
     if not init_file.exists():
-        init_file.write_text("# auto-created for Python package recognition\n", encoding="utf-8")
-        print(f"[+] Created {init_file.relative_to(Path(__file__).parent)}")
+        init_file.write_text("# auto-generated\n", encoding="utf-8")
+        print(f"    Created {init_file}")
 
-# --- 3. Rewrite imports to absolute (from sebas.XXX) ---
-pattern = re.compile(r"^(from\s+)([A-Za-z0-9_]+)(\s+import\s+.+)$")
-for pyfile in PACKAGE_ROOT.rglob("*.py"):
-    text = pyfile.read_text(encoding="utf-8", errors="ignore")
-    changed = []
-    lines = text.splitlines()
-    for i, line in enumerate(lines):
-        m = pattern.match(line.strip())
-        if m and not m.group(2).startswith("sebas"):
-            # Only rewrite if not already absolute
-            new_line = f"{m.group(1)}sebas.{m.group(2)}{m.group(3)}"
-            lines[i] = new_line
-            changed.append((i + 1, line.strip(), new_line))
-    if changed:
-        pyfile.write_text("\n".join(lines), encoding="utf-8")
-        print(f"[~] Updated imports in {pyfile.name}: {len(changed)} lines modified")
 
-# --- 4. Add .vscode/settings.json configuration for analysis ---
-vscode_dir = Path(__file__).parent / ".vscode"
-vscode_dir.mkdir(exist_ok=True)
-settings_path = vscode_dir / "settings.json"
-settings_json = """{
+# ---------------------------------------
+# 3. FIX imports → absolute sebas.xxx
+# ---------------------------------------
+import_rewrites = 0
+
+print("\n[+] Rewriting imports to absolute form (from sebas.xxx)...")
+
+for py in PACKAGE.rglob("*.py"):
+    text = py.read_text(encoding="utf-8", errors="ignore").splitlines()
+    new_lines = []
+    modified = False
+
+    for line in text:
+        stripped = line.strip()
+
+        # from X import Y → from sebas.X import Y
+        if stripped.startswith("from ") and " import " in stripped:
+            parts = stripped.split()
+            module = parts[1]
+
+            # Skip if already absolute or external module
+            if not module.startswith("sebas") and "." not in module:
+                line = line.replace(f"from {module} ", f"from sebas.{module} ")
+                modified = True
+                import_rewrites += 1
+
+        new_lines.append(line)
+
+    if modified:
+        py.write_text("\n".join(new_lines), encoding="utf-8")
+        print(f"    Updated imports in: {py.name}")
+
+print(f"[✔] Imports rewritten: {import_rewrites} modifications")
+
+
+# ---------------------------------------
+# 4. VSCode setup
+# ---------------------------------------
+vscode = root / ".vscode"
+vscode.mkdir(exist_ok=True)
+settings = vscode / "settings.json"
+
+settings.write_text(
+    """{
   "python.analysis.extraPaths": [
     "${workspaceFolder}/sebas"
   ],
-  "python.defaultInterpreterPath": "venv/Scripts/python.exe"
+  "python.defaultInterpreterPath": "venv_sebas/Scripts/python.exe"
 }
-"""
-if not settings_path.exists():
-    settings_path.write_text(settings_json, encoding="utf-8")
-    print("[+] Created VS Code settings.json")
+""",
+    encoding="utf-8"
+)
 
-# --- 5. Summary ---
-print("\n✅ SEBAS project structure repaired.")
-print("Now open VS Code, reload the window, and run:")
-print("    python -m sebas.main")
-print("\nYour imports and packages should now resolve cleanly.")
+print("\n[✔] VSCode settings applied")
+
+
+# ---------------------------------------
+# DONE
+# ---------------------------------------
+print("\n✅ SEBAS structure repaired successfully!")
+print("Restart VSCode for paths to refresh.")

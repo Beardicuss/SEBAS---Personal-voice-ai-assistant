@@ -2,7 +2,7 @@
 import logging
 import os
 import threading
-from typing import Optional, Dict, Any, List, Callable
+from sebas.typing import Optional, Dict, Any, List, Callable
 import time
 
 import requests

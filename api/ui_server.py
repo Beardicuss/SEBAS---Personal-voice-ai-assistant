@@ -1,8 +1,8 @@
 import os
 import sys
 import threading
-from flask import Flask, send_from_directory, jsonify, request
-from typing import Callable, Optional
+from sebas.flask import Flask, send_from_directory, jsonify, request
+from sebas.typing import Callable, Optional
 
 _state = {
     "mic": "idle",        # idle|listening
@@ -83,4 +83,3 @@ def start_ui_server(host: str = "127.0.0.1", port: int = 5000):
     t = threading.Thread(target=_run, daemon=True)
     t.start()
     return t
-

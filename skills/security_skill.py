@@ -3,10 +3,10 @@
 Security Management Skill
 Phase 4.1: Threat Management and Access Control
 """
-from typing import Optional
-from integrations.security_manager import SecurityManager
-from skills.base_skill import BaseSkill
-from typing import Dict, Any
+from sebas.typing import Optional
+from sebas.integrations.security_manager import SecurityManager
+from sebas.skills.base_skill import BaseSkill
+from sebas.typing import Dict, Any
 import logging
 
 
@@ -35,7 +35,7 @@ class SecuritySkill(BaseSkill):
     def _init_security_manager(self):
         """Initialize security manager."""
         try:
-            from integrations.security_manager import SecurityManager
+            from sebas.integrations.security_manager import SecurityManager
             self.security_manager = SecurityManager()
         except Exception:
             logging.exception("Failed to initialize security manager")

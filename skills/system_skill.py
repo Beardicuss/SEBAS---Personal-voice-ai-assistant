@@ -3,9 +3,9 @@
 System Skill - Handles system control commands like shutdown, restart, volume, brightness
 """
 
-from skills.base_skill import BaseSkill
-from typing import Dict, List, Any
-from datetime import datetime, timedelta
+from sebas.skills.base_skill import BaseSkill
+from sebas.typing import Dict, List, Any
+from sebas.datetime import datetime, timedelta
 import re
 
 
@@ -292,7 +292,7 @@ class SystemSkill(BaseSkill):
             if not city:
                 self.assistant.speak("Please specify a city")
                 return False
-            from integrations.news_weather import get_weather
+            from sebas.integrations.news_weather import get_weather
             ok, data = get_weather(city)
             if not ok:
                 self.assistant.speak(data.get('error', 'Failed to fetch weather'))
@@ -306,7 +306,7 @@ class SystemSkill(BaseSkill):
     def _handle_get_news(self, slots: Dict[str, Any]) -> bool:
         try:
             topic = (slots.get('topic') or self.assistant.prefs.get_pref('news_topic', 'technology'))
-            from integrations.news_weather import get_news
+            from sebas.integrations.news_weather import get_news
             ok, items = get_news(topic=topic)
             if not ok:
                 self.assistant.speak(items[0].get('error', 'Failed to fetch news'))
@@ -440,7 +440,7 @@ class SystemSkill(BaseSkill):
             try:
                 city = self.assistant.prefs.get_pref('weather_city', '')
                 if city:
-                    from integrations.news_weather import get_weather
+                    from sebas.integrations.news_weather import get_weather
                     ok, w = get_weather(city)
                     if ok:
                         weather_text = f"Weather in {w.get('city')}: {w.get('desc')}, {w.get('temp')}°C."
@@ -450,7 +450,7 @@ class SystemSkill(BaseSkill):
             # Calendar events today
             cal_text = "No calendar info."
             try:
-                from integrations.calendar_client import list_events
+                from sebas.integrations.calendar_client import list_events
                 start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
                 end = start + timedelta(days=1)
                 ok, items = list_events('microsoft', start.strftime('%Y-%m-%dT%H:%M:%S'), end.strftime('%Y-%m-%dT%H:%M:%S'), top=5)

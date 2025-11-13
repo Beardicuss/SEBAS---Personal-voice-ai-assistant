@@ -4,8 +4,8 @@ AI Analytics Skill
 Phase 6.1: Predictive Analytics and Anomaly Detection
 """
 
-from skills.base_skill import BaseSkill
-from typing import Dict, Any
+from sebas.skills.base_skill import BaseSkill
+from sebas.typing import Dict, Any
 import logging
 
 
@@ -41,7 +41,7 @@ class AIAnalyticsSkill(BaseSkill):
     def _init_analytics(self):
         """Initialize analytics components."""
         try:
-            from integrations.ai_analytics import (
+            from sebas.integrations.ai_analytics import (
                 AnomalyDetector, PredictiveAnalyzer,
                 PerformanceOptimizer, TroubleshootingGuide
             )

@@ -1,26 +1,38 @@
+"""
+Preference storage for SEBAS, including role persistence.
+"""
+
 import json
 import logging
 import os
-from datetime import datetime
-from typing import Any, Dict, Optional
+from sebas.datetime import datetime
+from sebas.typing import Any, Dict, Optional
 
 from sebas.constants.permissions import Role
 
 
 class PreferenceStore:
     """
-    Lightweight key/value store for SEBAS preferences.
-    Handles: prefs, history, user role, AD config.
+    Centralized user preferences storage.
+
+    Stores:
+    - language
+    - last used commands
+    - user role (STANDARD / ADMIN / OWNER / ADMIN_OWNER)
+    - future biometric identifiers
+    - custom SEBAS settings
     """
 
     def __init__(self, path: str):
         self.path = path
         self.data: Dict[str, Any] = {}
         self._load()
+        self._ensure_role_exists()
 
-    # ----------------------------------------------------
-    # Load & Save
-    # ----------------------------------------------------
+    # ----------------------------------------------------------
+    #  File operations
+    # ----------------------------------------------------------
+
     def _load(self):
         try:
             if os.path.isfile(self.path):
@@ -31,6 +43,7 @@ class PreferenceStore:
 
     def save(self):
         try:
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
             with open(self.path, "w", encoding="utf-8") as f:
                 json.dump(
                     self.data,
@@ -47,24 +60,21 @@ class PreferenceStore:
             return o.isoformat()
         return str(o)
 
-    # ----------------------------------------------------
-    # Command History
-    # ----------------------------------------------------
+    # ----------------------------------------------------------
+    #  History
+    # ----------------------------------------------------------
+
     def record_command(self, command: str):
         history = self.data.setdefault("history", [])
-        history.append({
-            "ts": datetime.now().isoformat(),
-            "command": command,
-        })
-
-        if len(history) > 200:  # keep last 200 commands
-            del history[:-200]
-
+        history.append({"ts": datetime.now().isoformat(), "command": command})
+        if len(history) > 200:
+            del history[: len(history) - 200]
         self.save()
 
-    # ----------------------------------------------------
-    # General Preferences
-    # ----------------------------------------------------
+    # ----------------------------------------------------------
+    #  Generic prefs
+    # ----------------------------------------------------------
+
     def set_pref(self, key: str, value: Any):
         self.data.setdefault("prefs", {})[key] = value
         self.save()
@@ -72,55 +82,36 @@ class PreferenceStore:
     def get_pref(self, key: str, default=None):
         return (self.data.get("prefs") or {}).get(key, default)
 
-    # ----------------------------------------------------
-    # Active Directory config support
-    # ----------------------------------------------------
-    def get_ad_config(self) -> Dict[str, Any]:
-        """
-        Returns AD config dictionary or empty dict.
-        Ensures main.py will never crash.
-        """
-        return self.data.get("ad_config", {}) or {}
+    # ----------------------------------------------------------
+    #  ROLE MANAGEMENT (NEW)
+    # ----------------------------------------------------------
 
-    # ----------------------------------------------------
-    # User Role handling
-    # ----------------------------------------------------
-    def set_user_role(self, role, from_ad: bool = False):
-        """
-        main.py may pass either:
-            - Role.ADMIN (enum)
-            - "ADMIN" (string)
-        Normalize everything to a plain uppercase string.
-        """
+    def _ensure_role_exists(self):
+        """Ensure role is always valid. Default = ADMIN_OWNER for your profile."""
+        if "user_role" not in self.data:
+            # Dante = ADMIN_OWNER by default
+            self.data["user_role"] = Role.ADMIN_OWNER.name
+            self.save()
 
-        if isinstance(role, Role):
-            role = role.name
-        elif isinstance(role, str):
-            role = role.strip().upper()
-        else:
-            logging.warning(f"Invalid role type: {role!r}")
-            return
-
-        user_data = self.data.setdefault("user", {})
-        user_data["role"] = role
-        user_data["role_from_ad"] = bool(from_ad)
-
+    def set_user_role(self, role: Role):
+        if not isinstance(role, Role):
+            raise ValueError("role must be a Role enum value")
+        self.data["user_role"] = role.name
         self.save()
 
-    def get_user_role(self) -> Optional[Role]:
-        """
-        Returns Role enum or None.
-        If stored value is invalid — return None.
-        """
-        role_name = (
-            (self.data.get("user") or {}).get("role")
-        )
-
-        if not role_name:
-            return None
-
+    def get_user_role(self) -> Role:
+        name = self.data.get("user_role", "").upper().strip()
         try:
-            return Role[role_name.upper()]
-        except KeyError:
-            logging.warning(f"Unknown role in prefs: {role_name}")
-            return None
+            return Role[name]
+        except Exception:
+            logging.warning(f"Invalid stored role '{name}', reset to STANDARD")
+            self.set_user_role(Role.STANDARD)
+            return Role.STANDARD
+
+    # ----------------------------------------------------------
+    #  ACTIVE DIRECTORY CONFIG PLACEHOLDER (SAFE)
+    # ----------------------------------------------------------
+
+    def get_ad_config(self):
+        """AD not implemented yet. Just return placeholder."""
+        return self.data.get("ad_config", {"enabled": False})

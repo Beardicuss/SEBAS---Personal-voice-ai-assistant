@@ -1,71 +1,61 @@
-# -*- coding: utf-8 -*-
 """
-Language Detection Manager
-Phase 1.3: Language recognition and management
+Language Manager for Sebas
+Responsible for detecting, switching and tracking active language.
 """
 
 import logging
-from typing import List
-from langdetect import detect, DetectorFactory
-from langdetect.lang_detect_exception import LangDetectException
-
-# Set deterministic seed for consistent results
-DetectorFactory.seed = 0
-LANGDETECT_AVAILABLE = True
+from typing import Optional
+from langdetect import detect, LangDetectException
 
 
 class LanguageManager:
-    """Manages language detection and selection."""
-
-    def __init__(self):
-        self.current_language: str = 'en'
-        self.language_history: List[str] = []
-        self.LANGUAGE_NAMES = {
+    def __init__(self, default_lang: str = "en"):
+        self.current_lang = default_lang.lower().strip()
+        self.supported_languages = {
             "en": "English",
             "ru": "Russian",
-            "de": "German"
+            "uk": "Ukrainian",
+            "ge": "Georgian",
+            "de": "German",
+            "fr": "French",
+            "es": "Spanish"
         }
 
+    # --------------------------------------
+    # Detect language from text
+    # --------------------------------------
     def detect_language(self, text: str) -> str:
-        """Detect the language of given text."""
         try:
-            if not LANGDETECT_AVAILABLE:
-                return self.current_language
-            if not text or len(text.strip()) < 3:
-                return self.current_language
-            code = detect(text)
-            if code in self.LANGUAGE_NAMES:
-                self.current_language = code
-                self.language_history.append(code)
-                if len(self.language_history) > 10:
-                    self.language_history.pop(0)
-                logging.info(f"Detected language: {self.LANGUAGE_NAMES[code]}")
-                return code
-            return self.current_language
+            lang = detect(text)
+            if lang in self.supported_languages:
+                self.current_lang = lang
+                logging.info(f"Language detected: {lang}")
+            else:
+                logging.info(f"Language '{lang}' detected but unsupported")
+            return lang
         except LangDetectException:
-            return self.current_language
-        except Exception:
-            logging.exception("Language detection failed")
-            return self.current_language
+            logging.warning("Could not detect language; using current")
+            return self.current_lang
 
-    def set_language(self, code: str) -> bool:
-        """Manually set active language."""
-        if code in self.LANGUAGE_NAMES:
-            self.current_language = code
+    # --------------------------------------
+    # Set manually
+    # --------------------------------------
+    def set_language(self, lang_code: str) -> bool:
+        code = (lang_code or "").lower().strip()
+
+        if code in self.supported_languages:
+            self.current_lang = code
+            logging.info(f"Language manually set to: {code}")
             return True
+
+        logging.warning(f"Unsupported language code: {lang_code}")
         return False
 
+    # --------------------------------------
+    # Getters
+    # --------------------------------------
+    def get_current_language(self) -> str:
+        return self.current_lang
+
     def get_current_language_name(self) -> str:
-        """Return current language name."""
-        return self.LANGUAGE_NAMES.get(self.current_language, "Unknown")
-
-    def get_language_name(self, code: str) -> str:
-        """Return human-readable name for a language code."""
-        return self.LANGUAGE_NAMES.get(code, "Unknown")
-
-    def current_languagee(self) -> str:
-        """Legacy alias for current language getter."""
-        return self.current_language
-    def get_iso3(self) -> str:
-        mapping = {"en": "eng", "ru": "rus", "de": "deu"}
-        return mapping.get(self.current_language, "eng")
+        return self.supported_languages.get(self.current_lang, "Unknown")

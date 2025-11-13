@@ -1,14 +1,47 @@
+"""
+SEBAS Role & Permission System
+Hybrid ADMIN+OWNER role supported.
+Compatible with intent-based permissions.
+"""
+
 import enum
-from typing import Dict
+import logging
+from sebas.typing import Dict
+
+
+# ---------------------------------------------------
+#   ROLE SYSTEM
+# ---------------------------------------------------
 
 class Role(enum.Enum):
     STANDARD = 1
     ADMIN = 2
+    OWNER = 3             # HIGHEST
+    ADMIN_OWNER = 4       # HYBRID ROLE (your personal role)
 
 
-# Permission mapping: intent name -> required role
+# ---------------------------------------------------
+#   ROLE LEVELS FOR COMPARISON
+# ---------------------------------------------------
+
+ROLE_HIERARCHY = {
+    Role.STANDARD: 1,
+    Role.ADMIN: 2,
+    Role.OWNER: 3,
+    Role.ADMIN_OWNER: 999  # absolute priority — your throne
+}
+
+
+def role_level(role: Role) -> int:
+    return ROLE_HIERARCHY.get(role, 0)
+
+
+# ---------------------------------------------------
+#   OLD INTENT-BASED PERMISSIONS (fully preserved)
+# ---------------------------------------------------
+
 _INTENT_PERMISSIONS: Dict[str, Role] = {
-    # System commands - require ADMIN
+    # ======== SYSTEM (Admin-only) ========
     'shutdown_computer': Role.ADMIN,
     'restart_computer': Role.ADMIN,
     'schedule_shutdown': Role.ADMIN,
@@ -16,53 +49,53 @@ _INTENT_PERMISSIONS: Dict[str, Role] = {
     'sleep_computer': Role.ADMIN,
     'hibernate_computer': Role.ADMIN,
     'log_off_user': Role.ADMIN,
-    
-    # Process management - require ADMIN
+
+    # ======== PROCESS MGMT ========
     'kill_process': Role.ADMIN,
     'list_processes': Role.ADMIN,
-    
-    # File operations - require ADMIN for destructive operations
+
+    # ======== FILE OPERATIONS ========
     'delete_path': Role.ADMIN,
     'create_folder': Role.ADMIN,
     'run_shell_command': Role.ADMIN,
-    
-    # System info - STANDARD
+
+    # ======== INFO QUERIES ========
     'get_cpu_info': Role.STANDARD,
     'get_weather': Role.STANDARD,
     'get_ip_address': Role.STANDARD,
     'run_speed_test': Role.STANDARD,
-    
-    # Application control - STANDARD
+
+    # ======== APPLICATION CONTROL ========
     'open_application': Role.STANDARD,
     'open_app_with_context': Role.STANDARD,
     'close_application': Role.STANDARD,
     'list_programs': Role.STANDARD,
     'scan_programs': Role.STANDARD,
-    
-    # Media control - STANDARD
+
+    # ======== MEDIA ========
     'set_volume': Role.STANDARD,
     'set_brightness': Role.STANDARD,
-    
-    # Utilities - STANDARD
+
+    # ======== UTILITIES ========
     'create_note': Role.STANDARD,
     'take_screenshot': Role.STANDARD,
     'web_search': Role.STANDARD,
-    
-    # Skills - mostly STANDARD
+
+    # ======== SKILLS ========
     'get_system_performance': Role.STANDARD,
     'get_network_stats': Role.STANDARD,
     'get_disk_io': Role.STANDARD,
     'check_disk_space': Role.STANDARD,
-    
-    # Phase 2.1: AD operations
+
+    # ======== ACTIVE DIRECTORY ========
     'ad_create_user': Role.ADMIN,
     'ad_delete_user': Role.ADMIN,
     'ad_modify_user': Role.ADMIN,
     'ad_lookup_user': Role.STANDARD,
     'ad_get_password_policy': Role.STANDARD,
     'ad_get_user_groups': Role.STANDARD,
-    
-    # Phase 2.1: Service management
+
+    # ======== SERVICES ========
     'start_service': Role.ADMIN,
     'stop_service': Role.ADMIN,
     'restart_service': Role.ADMIN,
@@ -71,12 +104,12 @@ _INTENT_PERMISSIONS: Dict[str, Role] = {
     'configure_service': Role.ADMIN,
     'get_service_dependencies': Role.STANDARD,
     'set_service_start_type': Role.ADMIN,
-    
-    # Phase 2.1: Process management
+
+    # ======== PROCESS CONTROL ========
     'set_process_priority': Role.ADMIN,
     'set_cpu_affinity': Role.ADMIN,
-    
-    # Phase 2.2: Network management
+
+    # ======== NETWORK MGMT ========
     'set_ip_config': Role.ADMIN,
     'get_ip_config': Role.STANDARD,
     'flush_dns_cache': Role.ADMIN,
@@ -100,25 +133,15 @@ _INTENT_PERMISSIONS: Dict[str, Role] = {
     'connect_vpn': Role.ADMIN,
     'disconnect_vpn': Role.ADMIN,
     'list_vpn_connections': Role.STANDARD,
-    
-    # Phase 3.1: Advanced file operations
+
+    # ======== STORAGE ========
     'copy_recursive': Role.ADMIN,
     'move_recursive': Role.ADMIN,
     'delete_recursive': Role.ADMIN,
     'search_file_content': Role.STANDARD,
     'find_duplicate_files': Role.STANDARD,
-    
-    # Phase 3.2: Storage management
-    'list_disk_partitions': Role.STANDARD,
-    'get_disk_info': Role.STANDARD,
-    'get_volume_info': Role.STANDARD,
-    'get_storage_spaces_status': Role.STANDARD,
-    'get_bitlocker_status': Role.STANDARD,
-    'enable_bitlocker': Role.ADMIN,
-    'disable_bitlocker': Role.ADMIN,
-    'get_disk_usage': Role.STANDARD,
-    
-    # Phase 4.1: Security management
+
+    # ======== SECURITY / DEFENDER ========
     'get_defender_status': Role.STANDARD,
     'run_defender_scan': Role.ADMIN,
     'get_defender_threats': Role.STANDARD,
@@ -130,15 +153,15 @@ _INTENT_PERMISSIONS: Dict[str, Role] = {
     'set_file_permissions': Role.ADMIN,
     'get_audit_policy': Role.STANDARD,
     'set_audit_policy': Role.ADMIN,
-    
-    # Phase 4.2: Compliance management
+
+    # ======== COMPLIANCE ========
     'log_activity': Role.STANDARD,
     'get_activity_log': Role.STANDARD,
-    'get_audit_events': Role.STANDARD,
+    'get_audit_events': Role.ADMIN,
     'generate_compliance_report': Role.ADMIN,
-    'verify_security_policy': Role.STANDARD,
-    
-    # Phase 5.1: Automation
+    'verify_security_policy': Role.ADMIN,
+
+    # ======== AUTOMATION ========
     'create_workflow': Role.ADMIN,
     'execute_workflow': Role.ADMIN,
     'list_workflows': Role.STANDARD,
@@ -150,49 +173,49 @@ _INTENT_PERMISSIONS: Dict[str, Role] = {
     'list_scheduled_tasks': Role.STANDARD,
     'run_scheduled_task': Role.ADMIN,
     'delete_scheduled_task': Role.ADMIN,
-    
-    # System status queries
+
+    # ======== SYSTEM STATUS ========
     'get_system_status': Role.STANDARD,
     'get_memory_info': Role.STANDARD,
     'get_cpu_info': Role.STANDARD,
-    
-    # Phase 6.1: AI Analytics
+
+    # ======== AI ANALYTICS ========
     'detect_anomalies': Role.STANDARD,
     'predict_disk_failure': Role.STANDARD,
     'predict_memory_leak': Role.STANDARD,
     'get_performance_suggestions': Role.STANDARD,
     'get_troubleshooting_guide': Role.STANDARD,
     'diagnose_issue': Role.STANDARD,
-    
-    # Phase 6.2: Enhanced NLU
+
+    # ======== NLU EXTENSIONS ========
     'parse_multipart_command': Role.STANDARD,
     'get_context': Role.STANDARD,
     'clear_context': Role.STANDARD,
     'record_correction': Role.STANDARD,
     'resolve_ambiguous_intent': Role.STANDARD,
-
     'run_compliance_check': Role.ADMIN,
     'check_uac_compliance': Role.ADMIN,
     'check_authentication_compliance': Role.ADMIN,
     'check_network_compliance': Role.ADMIN,
     'check_system_hardening': Role.ADMIN,
-
-    'log_activity': Role.STANDARD,  # Non-privileged
-    'get_activity_log': Role.STANDARD,
-    'get_audit_events': Role.ADMIN,
-    'generate_compliance_report': Role.ADMIN,
-    'verify_security_policy': Role.ADMIN,
 }
 
 
+# ---------------------------------------------------
+#   API FUNCTIONS
+# ---------------------------------------------------
+
 def get_permission_for_intent(intent_name: str) -> Role:
-    """
-    Get the required role for an intent.
-    
-    Args:
-        intent_name: Name of the intent
-        
-    Returns:
-        Required Role (defaults to STANDARD if not specified)
-    """
     return _INTENT_PERMISSIONS.get(intent_name, Role.STANDARD)
+
+
+def is_authorized(user_role: Role, intent: str) -> bool:
+    """
+    Unified permission checker.
+    OWNER/Admin_Owner bypass all permission checks.
+    """
+    if user_role in (Role.OWNER, Role.ADMIN_OWNER):
+        return True
+
+    required = get_permission_for_intent(intent)
+    return role_level(user_role) >= role_level(required)

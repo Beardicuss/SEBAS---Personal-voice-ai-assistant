@@ -1,7 +1,7 @@
 import socket
 import json
 import logging
-from typing import Any, Dict, Optional
+from sebas.typing import Any, Dict, Optional
 
 from .constants.preferences import PreferenceStore
 from .constants.permissions import Role

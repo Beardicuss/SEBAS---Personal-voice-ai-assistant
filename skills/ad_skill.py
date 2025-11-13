@@ -4,8 +4,8 @@ Active Directory Management Skill
 Phase 2.1: AD user account management
 """
 
-from skills.base_skill import BaseSkill
-from typing import Dict, Any
+from sebas.skills.base_skill import BaseSkill
+from sebas.typing import Dict, Any
 import logging
 
 

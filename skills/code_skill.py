@@ -3,14 +3,14 @@
 Code Skill - Voice-to-code functionality with code generation, editing, and validation
 """
 
-from skills.base_skill import BaseSkill
-from typing import Dict, List, Any, Optional, Tuple
+from sebas.skills.base_skill import BaseSkill
+from sebas.typing import Dict, List, Any, Optional, Tuple
 import os
 import ast
 import re
 import json
 import string
-from pathlib import Path
+from sebas.pathlib import Path
 import logging
 
 

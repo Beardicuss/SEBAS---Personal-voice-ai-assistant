@@ -4,8 +4,8 @@ Windows Service Management Skill
 Phase 2.1: Service control and management
 """
 
-from skills.base_skill import BaseSkill
-from typing import Dict, Any
+from sebas.skills.base_skill import BaseSkill
+from sebas.typing import Dict, Any
 import logging
 
 
@@ -32,7 +32,7 @@ class ServiceSkill(BaseSkill):
     def _init_service_manager(self):
         """Initialize service manager."""
         try:
-            from integrations.windows_service_manager import WindowsServiceManager
+            from sebas.integrations.windows_service_manager import WindowsServiceManager
             self.service_manager = WindowsServiceManager()
         except Exception:
             logging.exception("Failed to initialize service manager")
@@ -185,7 +185,7 @@ class ServiceSkill(BaseSkill):
         try:
             state_filter = slots.get('state')  # e.g., 'running', 'stopped'
             
-            from integrations.windows_service_manager import ServiceState
+            from sebas.integrations.windows_service_manager import ServiceState
             state_enum = None
             if state_filter:
                 try:
@@ -225,7 +225,7 @@ class ServiceSkill(BaseSkill):
                 self.assistant.speak("Please specify a service name")
                 return False
             
-            from integrations.windows_service_manager import ServiceStartType
+            from sebas.integrations.windows_service_manager import ServiceStartType
             try:
                 start_type = ServiceStartType(start_type_str.lower())
             except ValueError:

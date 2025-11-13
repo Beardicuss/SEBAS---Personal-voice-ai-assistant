@@ -3,9 +3,9 @@
 Smart Home Skill - Handles smart home device control and automation
 """
 
-from skills.base_skill import BaseSkill
-from integrations.smart_home import HomeAssistantClient
-from typing import Dict, List, Any, Optional
+from sebas.skills.base_skill import BaseSkill
+from sebas.integrations.smart_home import HomeAssistantClient
+from sebas.typing import Dict, List, Any, Optional
 import re
 import threading
 

@@ -6,8 +6,8 @@ Skill Registry - Dynamically loads and manages SEBAS skills
 import os
 import importlib.util
 import inspect
-from typing import List, Dict, Any, Optional
-from skills.base_skill import BaseSkill
+from sebas.typing import List, Dict, Any, Optional
+from sebas.skills.base_skill import BaseSkill
 import logging
 
 

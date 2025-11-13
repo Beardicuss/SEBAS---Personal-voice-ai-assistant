@@ -3,10 +3,10 @@ Storage Management Skill
 Phase 3.2: Storage administration
 """
 
-from skills.base_skill import BaseSkill
-from typing import Dict, Any
+from sebas.skills.base_skill import BaseSkill
+from sebas.typing import Dict, Any
 import logging
-from integrations.storage_manager import StorageManager
+from sebas.integrations.storage_manager import StorageManager
 
 class StorageSkill(BaseSkill):
     """
@@ -31,7 +31,7 @@ class StorageSkill(BaseSkill):
     def _init_storage_manager(self):
         """Initialize storage manager."""
         try:
-            from integrations.storage_manager import StorageManager
+            from sebas.integrations.storage_manager import StorageManager
             self.storage_manager = StorageManager()
         except Exception:
             logging.exception("Failed to initialize storage manager")

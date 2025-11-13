@@ -3,15 +3,15 @@
 Application Skill - Handles application launching and closing with advanced features
 """
 
-from skills.base_skill import BaseSkill
-from typing import Dict, List, Any, Optional
+from sebas.skills.base_skill import BaseSkill
+from sebas.typing import Dict, List, Any, Optional
 import os
 import time
 import json
 import threading
 import subprocess
 import difflib
-from collections import defaultdict, Counter
+from sebas.collections import defaultdict, Counter
 import psutil
 import winreg
 try:

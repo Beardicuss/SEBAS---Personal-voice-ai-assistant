@@ -7,8 +7,8 @@ Phase 5.2: Ticket systems, monitoring, asset management
 import logging
 import json
 import requests
-from datetime import datetime
-from typing import Optional, Dict, List, Any, Tuple
+from sebas.datetime import datetime
+from sebas.typing import Optional, Dict, List, Any, Tuple
 
 
 class TicketSystem:

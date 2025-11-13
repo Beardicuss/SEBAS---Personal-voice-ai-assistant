@@ -4,10 +4,10 @@ Compliance Management Skill
 Phase 4.2: Compliance reporting and activity monitoring
 """
 
-from skills.base_skill import BaseSkill
-from typing import Dict, Any
+from sebas.skills.base_skill import BaseSkill
+from sebas.typing import Dict, Any
 import logging
-from datetime import datetime, timedelta
+from sebas.datetime import datetime, timedelta
 
 
 class ComplianceSkill(BaseSkill):
@@ -30,7 +30,7 @@ class ComplianceSkill(BaseSkill):
     def _init_compliance_manager(self):
         """Initialize compliance manager."""
         try:
-            from integrations.compliance_manager import ComplianceManager
+            from sebas.integrations.compliance_manager import ComplianceManager
             self.compliance_manager = ComplianceManager(self.assistant.service_client)
         except Exception:
             logging.exception("Failed to initialize compliance manager")

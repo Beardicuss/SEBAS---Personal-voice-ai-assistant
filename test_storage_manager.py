@@ -3,7 +3,7 @@
 Quick test for integrations.storage_manager
 """
 
-from integrations.storage_manager import StorageManager
+from sebas.integrations.storage_manager import StorageManager
 import pprint
 
 if __name__ == "__main__":

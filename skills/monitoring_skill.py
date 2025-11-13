@@ -10,7 +10,7 @@ import os
 import psutil
 import logging
 import time
-from typing import Optional
+from sebas.typing import Optional
 from .base_skill import BaseSkill
 
 class MonitoringSkill(BaseSkill):

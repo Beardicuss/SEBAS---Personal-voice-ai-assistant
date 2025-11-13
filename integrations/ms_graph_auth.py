@@ -14,7 +14,7 @@ import json
 import logging
 import webbrowser
 import requests
-from typing import Dict, Tuple, Optional, List
+from sebas.typing import Dict, Tuple, Optional, List
 
 CACHE_PATH = os.path.join(os.path.expanduser('~'), '.sebas_ms_graph_token.json')
 

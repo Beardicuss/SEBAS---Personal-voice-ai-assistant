@@ -5,10 +5,10 @@ Rate Limiting Framework
 
 import time
 import logging
-from typing import Dict, Tuple, Optional
-from collections import defaultdict
-from functools import wraps
-from flask import request, jsonify, g
+from sebas.typing import Dict, Tuple, Optional
+from sebas.collections import defaultdict
+from sebas.functools import wraps
+from sebas.flask import request, jsonify, g
 
 
 class RateLimiter:

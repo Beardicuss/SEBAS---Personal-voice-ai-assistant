@@ -3,9 +3,9 @@
 API Versioning Support
 """
 
-from enum import Enum
-from typing import Optional
-from flask import request
+from sebas.enum import Enum
+from sebas.typing import Optional
+from sebas.flask import request
 
 
 class APIVersion(Enum):

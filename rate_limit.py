@@ -1,4 +1,4 @@
-from functools import wraps
+from sebas.functools import wraps
 import time
 
 def rate_limit(limit=None, per_seconds=None):
