@@ -42,12 +42,12 @@ ok, rules = fw.list_firewall_rules("TestRule")
 print(rules)
 fw.delete_firewall_rule("TestRule")
 
-from integrations.file_operations import FileOperations
-f = FileOperations()
-ok, stats = f.copy_recursive("C:/temp/source", "C:/temp/dest", pattern="*.txt", overwrite=True)
-print(ok, stats)
-dupes = f.find_duplicate_files("C:/temp")
-print("Duplicates:", dupes)
+# from integrations.file_operations import FileOperations
+# f = FileOperations()
+# ok, stats = f.copy_recursive("C:/temp/source", "C:/temp/dest", pattern="*.txt", overwrite=True)
+# print(ok, stats)
+# dupes = f.find_duplicate_files("C:/temp")
+# print("Duplicates:", dupes)
 
 
 

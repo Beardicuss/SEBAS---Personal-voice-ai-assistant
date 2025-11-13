@@ -4,10 +4,12 @@ Default: English. Supported: en, ru, de.
 Handles both PiperVoice APIs: speak(text, path) and synthesize(...) -> Iterable[AudioChunk].
 """
 
+import os
 import logging
 import tempfile
 import wave
 from typing import List, Dict, Optional, Iterable, Any
+
 from piper import PiperVoice
 
 try:
@@ -39,18 +41,65 @@ class PiperVoiceEngine:
     def set_voice_for_language(self, language: str, model_name: str) -> None:
         lang = language.lower()
         self.voice_map[lang] = model_name
-        self._cache.pop(model_name, None)
+        # Clear any old cached instance for that model
+        if model_name in self._cache:
+            self._cache.pop(model_name, None)
         logging.info("[Piper] Voice for '%s' set to '%s'", lang, model_name)
 
     def get_available_languages(self) -> List[str]:
         return sorted(self.voice_map.keys())
 
     def _load_voice(self, model: str) -> Optional[PiperVoice]:
+        """
+        Safe load Piper model from sebas/voices/<model>.json + <model>.onnx
+        Automatically fixes model names like:
+          en_US-lessac-medium.json
+          en_US-lessac-medium.onnx
+          en_US-lessac-medium.json.json
+        """
+
         try:
-            if model not in self._cache:
-                logging.info("[Piper] Loading model: %s", model)
-                self._cache[model] = PiperVoice.load(model)
-            return self._cache[model]
+            # ---------------------------
+            # FIX: Normalize model name
+            # ---------------------------
+            model = model.strip()
+
+            # Remove garbage extensions
+            for ext in (".json", ".onnx"):
+                if model.endswith(ext):
+                    model = model[:-len(ext)]
+
+            # Remove double-extension mutation (json.json)
+            while model.endswith(".json"):
+                model = model[:-5]
+
+            # Cache check
+            if model in self._cache:
+                return self._cache[model]
+
+            logging.info("[Piper] Loading model: %s", model)
+
+            # Build voices dir
+            voices_dir = os.path.join(os.path.dirname(__file__), "..", "voices")
+            voices_dir = os.path.abspath(voices_dir)
+
+            # Build paths
+            json_path = os.path.join(voices_dir, f"{model}.json")
+            onnx_path = os.path.join(voices_dir, f"{model}.onnx")
+
+            # Validation
+            if not os.path.exists(json_path):
+                raise FileNotFoundError(f"[Piper] Missing JSON config: {json_path}")
+            if not os.path.exists(onnx_path):
+                raise FileNotFoundError(f"[Piper] Missing ONNX model: {onnx_path}")
+
+            # Load Piper model
+            voice = PiperVoice.load(json_path)
+
+            # Store in cache
+            self._cache[model] = voice
+            return voice
+
         except Exception:
             logging.exception("[Piper] Failed to load model: %s", model)
             return None
@@ -74,46 +123,39 @@ class PiperVoiceEngine:
         We will read params from the first chunk and assume constant over the stream.
         """
         first_chunk: Optional[Any] = None
-        # Peek first chunk
         iterator = iter(chunks)
         try:
             first_chunk = next(iterator)
         except StopIteration:
             raise RuntimeError("Empty audio chunk stream")
 
-        # Extract params from first chunk with defensive defaults
         sr = getattr(first_chunk, "sample_rate", 22050)
         ch = getattr(first_chunk, "num_channels", 1)
-        sw = getattr(first_chunk, "sample_width", 2)  # bytes per sample
+        sw = getattr(first_chunk, "sample_width", 2)
 
-        # Prepare wave writer
         with wave.open(out_path, "wb") as wf:
             wf.setnchannels(int(ch))
             wf.setsampwidth(int(sw))
             wf.setframerate(int(sr))
 
             def write_piece(x: Any) -> None:
-                # Try common attribute names first
                 if hasattr(x, "audio"):
                     data = x.audio
                 elif hasattr(x, "data"):
                     data = x.data
                 else:
-                    data = x  # might be bytes/bytearray/memoryview
-                # Normalize to bytes
+                    data = x
                 if isinstance(data, memoryview):
                     data = data.tobytes()
                 elif isinstance(data, bytearray):
                     data = bytes(data)
                 elif not isinstance(data, (bytes, bytearray)):
-                    # Last-ditch attempt
                     try:
                         data = bytes(data)
                     except Exception:
                         raise TypeError(f"Unsupported audio chunk type: {type(x)}")
                 wf.writeframesraw(data)
 
-            # write first + rest
             write_piece(first_chunk)
             for chunk in iterator:
                 write_piece(chunk)
@@ -128,24 +170,19 @@ class PiperVoiceEngine:
         lang = (language or self.default_language or "en").lower()
 
         try:
-            # create temp wav path
             with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{lang}.wav") as tmp:
                 out = tmp.name
 
-            # API variant A: voice.speak(text, path)
             if hasattr(voice, "speak"):
                 voice.speak(text, out)  # type: ignore[attr-defined]
             else:
-                # API variant B: voice.synthesize(...) -> Iterable[AudioChunk] or bytes-like
                 data = voice.synthesize(text)  # type: ignore[attr-defined]
                 if isinstance(data, (bytes, bytearray, memoryview)):
                     with open(out, "wb") as f:
                         f.write(bytes(data))
                 else:
-                    # Iterable[AudioChunk]: assemble to WAV
                     self._concat_chunks_to_wav(data, out)
 
-            # play no matter which branch produced the file
             if _ws:
                 _ws.PlaySound(out, _ws.SND_FILENAME)
             return True

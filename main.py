@@ -39,6 +39,10 @@ from sebas.logging_config import setup_structured_logging, log_with_context, get
 # Profile-aware base directory for logs and preferences
 PROFILE_NAME = os.environ.get('SEBAS_PROFILE', 'default').strip() or 'default'
 PROFILE_DIR = os.path.join(os.path.expanduser('~'), '.sebas', 'profiles', PROFILE_NAME)
+print("=== USING PROFILE DIRECTORY ===")
+print(PROFILE_DIR)
+print("=== PROFILE NAME =", PROFILE_NAME, "===")
+
 try:
     os.makedirs(PROFILE_DIR, exist_ok=True)
 except Exception:
