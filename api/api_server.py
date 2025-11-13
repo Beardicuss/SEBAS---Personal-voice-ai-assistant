@@ -1,18 +1,16 @@
-# -*- coding: utf-8 -*-
 """
 SEBAS API Server
 Phase 1.4: Functional Intent Execution
 """
-
+import subprocess
+import os
 import logging
 import threading
 from datetime import datetime
 from typing import Optional
-import subprocess
-import os
-
 from flask import Flask, jsonify, request
 from sebas.constants.permissions import Role
+from sebas.services.nlu import SimpleNLU
 
 # Optional CORS support
 try:
@@ -37,7 +35,7 @@ from .websocket import (
     init_websocket_manager,
     get_websocket_manager as websock,
 )
-from sebas.services.nlu import SimpleNLU
+from services.nlu import SimpleNLU
 
 
 class APIServer:
@@ -129,20 +127,25 @@ class APIServer:
                         "confidence": 0.0,
                     }), 200
 
-                intent_name = intent.name.lower()
+                # Safe access to intent fields to keep Pylance calm
+                intent_name = str(getattr(intent, "name", "") or "").lower()
+                slots = getattr(intent, "slots", {}) or {}
+                confidence = float(getattr(intent, "confidence", 1.0) or 1.0)
+
                 response_message = None
 
                 # === Simple Action Layer ===
-                if "notepad" in text.lower():
+                lowered = text.lower()
+                if "notepad" in lowered:
                     subprocess.Popen("notepad.exe")
                     response_message = "Opened Notepad"
-                elif "calculator" in text.lower():
+                elif "calculator" in lowered:
                     subprocess.Popen("calc.exe")
                     response_message = "Opened Calculator"
-                elif "browser" in text.lower() or "chrome" in text.lower():
+                elif "browser" in lowered or "chrome" in lowered:
                     subprocess.Popen("start chrome", shell=True)
                     response_message = "Opened Browser"
-                elif "command prompt" in text.lower() or "cmd" in text.lower():
+                elif "command prompt" in lowered or "cmd" in lowered:
                     subprocess.Popen("cmd.exe")
                     response_message = "Opened Command Prompt"
                 else:
@@ -150,13 +153,14 @@ class APIServer:
 
                 return jsonify({
                     "response": response_message,
-                    "slots": intent.slots,
-                    "confidence": intent.confidence,
+                    "slots": slots,
+                    "confidence": confidence,
                 }), 200
 
             except Exception as e:
                 logging.exception("Error in /api/parse")
                 return jsonify({"error": str(e)}), 500
+
 
     # =====================================================
     # === SERVER STARTUP LOGIC ============================

@@ -35,13 +35,21 @@ from PIL import ImageGrab
 from sebas.logging_config import setup_structured_logging, log_with_context, get_audit_logger
 
 
-# ----------------------- Profiles & Logging -----------------------
-# Profile-aware base directory for logs and preferences
-PROFILE_NAME = os.environ.get('SEBAS_PROFILE', 'default').strip() or 'default'
-PROFILE_DIR = os.path.join(os.path.expanduser('~'), '.sebas', 'profiles', PROFILE_NAME)
+# ---- PROFILE DIRECTORY FIX ----
+# Always store profiles in: D:\SEBAS - Personal voice ai assistant\profiles
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROFILES_ROOT = os.path.join(PROJECT_ROOT, "profiles")
+
+# default profile folder
+profile_name = "default"
+PROFILE_DIR = os.path.join(PROFILES_ROOT, profile_name)
+
+# create the folder if it doesn't exist
+os.makedirs(PROFILE_DIR, exist_ok=True)
+
 print("=== USING PROFILE DIRECTORY ===")
 print(PROFILE_DIR)
-print("=== PROFILE NAME =", PROFILE_NAME, "===")
+print(f"=== PROFILE NAME = {profile_name} ===")
 
 try:
     os.makedirs(PROFILE_DIR, exist_ok=True)
@@ -264,46 +272,53 @@ class Sebas:
         self.microphone = True
         # Client for the privileged service
         self.service_client = ServiceClient()
-        # Premium modules
-                # Premium modules (без жесткой зависимости от AD)
-        # Premium modules (без жесткой зависимости от AD)
+        # --------------------------------------------------------
+# Premium modules (VALID & REAL — ONLY WHAT YOU HAVE)
+# --------------------------------------------------------
         try:
             from sebas.services.nlu import SimpleNLU, ContextManager
             from sebas.services.task_manager import TaskManager
-            # from integrations.smart_home import HomeAssistantClient
             from sebas.integrations.calendar_client import CalendarClient
             from sebas.integrations.email_client import EmailClient
+            from sebas.integrations.ad_client import ADClient
             from sebas.constants.preferences import PreferenceStore
             from sebas.constants.suggestions import SuggestionEngine
-            from core.skill_registry import SkillRegistry
+            from sebas.services.skill_registry import SkillRegistry
 
+            # Core assistant modules
             self.voice = self.tts_engine
             self.nlu = SimpleNLU()
             self.context = ContextManager()
             self.tasks = TaskManager()
-            # self.smarthome = HomeAssistantClient()
+
+            # Optional integrations
             self.calendar = CalendarClient()
             self.email = EmailClient()
-            try:
-                profile_dir = PROFILE_DIR
-            except Exception:
-                profile_dir = os.path.join(os.path.expanduser('~'), '.sebas')
 
-            self.prefs = PreferenceStore(os.path.join(profile_dir, 'prefs.json'))
+            # Preferences & suggestions
+            pref_path = os.path.join(PROFILE_DIR, "prefs.json")
+            self.prefs = PreferenceStore(pref_path)
             self.suggestions = SuggestionEngine(self.prefs)
+
+            # Skills
+            skills_dir = os.path.join(BASE_DIR, "skills")
+            self.skill_registry = SkillRegistry(self, skills_dir=skills_dir)
+            self.skill_registry.load_skill_preferences()
+
         except Exception:
             logging.exception("Failed to initialize premium modules")
+
 
             # Phase 2–6 как у тебя дальше (WindowsServiceManager, NetworkManager и прочее)
                     # Premium modules (без жесткой зависимости от AD)
         try:
-            from sebas.services.nlu import SimpleNLU, ContextManager
+            from services.nlu import SimpleNLU, ContextManager
             from sebas.services.task_manager import TaskManager
             from sebas.integrations.calendar_client import CalendarClient
             from sebas.integrations.email_client import EmailClient
             from sebas.constants.preferences import PreferenceStore
             from sebas.constants.suggestions import SuggestionEngine
-            from core.skill_registry import SkillRegistry
+            from services.skill_registry import SkillRegistry
 
             # VoiceSystem уже инициализирован как self.tts_engine
             self.voice = self.tts_engine
@@ -754,87 +769,98 @@ class Sebas:
         ]
         for p in phrases:
             self.speak(p)
+
     # ----------------------- Listening -----------------------
-        def listen(self, timeout=5, phrase_time_limit=10):
-            if self.microphone is None:
-                logging.warning("Microphone not available.")
-                return ""
+    def listen(self, timeout=5, phrase_time_limit=10):
+        if self.microphone is None:
+            logging.warning("Microphone not available.")
+            return ""
 
-            # ===== Capture audio =====
-            try:
-                with self.audio_lock:
+        # ===== Capture audio =====
+        try:
+            with self.audio_lock:
+                try:
+                    source_cm = sr.Microphone(device_index=self.microphone_device_index)
+                except Exception:
+                    source_cm = sr.Microphone()
+
+                with source_cm as source:
+                    if not hasattr(self, "_mic_calibrated"):
+                        if getattr(source, "stream", None):
+                            self.recognizer.adjust_for_ambient_noise(source, duration=1)
+                            self._mic_calibrated = True
+
                     try:
-                        source_cm = sr.Microphone(device_index=self.microphone_device_index)
-                    except Exception:
-                        source_cm = sr.Microphone()
-
-                    with source_cm as source:
-                        if not hasattr(self, "_mic_calibrated"):
-                            if getattr(source, "stream", None):
-                                self.recognizer.adjust_for_ambient_noise(source, duration=1)
-                                self._mic_calibrated = True
-
-                        try:
-                            requests.post("http://127.0.0.1:5000/api/status",
-                                        json={"mic": "listening"}, timeout=0.25)
-                        except Exception:
-                            pass
-
-                        audio = self.recognizer.listen(
-                            source,
-                            timeout=timeout,
-                            phrase_time_limit=phrase_time_limit
+                        requests.post(
+                            "http://127.0.0.1:5000/api/status",
+                            json={"mic": "listening"},
+                            timeout=0.25
                         )
-
-            except sr.WaitTimeoutError:
-                return ""
-            except Exception as e:
-                logging.exception(f"Error while listening: {e}")
-                return ""
-
-            # ===== Recognition =====
-            try:
-                try:
-                    requests.post("http://127.0.0.1:5000/api/level",
-                                json={"level": 0.2}, timeout=0.2)
-                except Exception:
-                    pass
-
-                text = ""
-
-                with self.audio_lock:
-                    # Try Vosk first
-                    try:
-                        text = self.recognizer.recognize_vosk(audio).lower()
                     except Exception:
-                        # Google fallback safely
-                        if hasattr(self.recognizer, "recognize_google"):
-                            google_recognizer = getattr(self.recognizer, "recognize_google")
-                            try:
-                                text = google_recognizer(audio).lower()
-                            except sr.UnknownValueError:
-                                return ""
-                            except sr.RequestError as e:
-                                logging.error(f"Speech recognition service error: {e}")
-                                self.speak("Speech recognition service unavailable")
-                                return ""
-                        else:
-                            logging.error("Google recognition is not available.")
-                            return ""
+                        pass
 
-                logging.debug(f"Recognized: {text}")
-                return text
+                    audio = self.recognizer.listen(
+                        source,
+                        timeout=timeout,
+                        phrase_time_limit=phrase_time_limit
+                    )
 
-            except Exception as e:
-                logging.exception(f"Unexpected recognition error: {e}")
-                return ""
+        except sr.WaitTimeoutError:
+            return ""
+        except Exception as e:
+            logging.exception(f"Error while listening: {e}")
+            return ""
 
-            finally:
+        # ===== Recognition =====
+        try:
+            try:
+                requests.post(
+                    "http://127.0.0.1:5000/api/level",
+                    json={"level": 0.2},
+                    timeout=0.2
+                )
+            except Exception:
+                pass
+
+            text = ""
+
+            with self.audio_lock:
+                # Try Vosk first
                 try:
-                    requests.post("http://127.0.0.1:5000/api/status",
-                                json={"mic": "idle"}, timeout=0.25)
+                    text = self.recognizer.recognize_vosk(audio).lower()
                 except Exception:
-                    pass
+                    # Google fallback safely
+                    if hasattr(self.recognizer, "recognize_google"):
+                        google_recognizer = getattr(self.recognizer, "recognize_google")
+                        try:
+                            text = google_recognizer(audio).lower()
+                        except sr.UnknownValueError:
+                            return ""
+                        except sr.RequestError as e:
+                            logging.error(f"Speech recognition service error: {e}")
+                            self.speak("Speech recognition service unavailable")
+                            return ""
+                    else:
+                        logging.error("Google recognition is not available.")
+                        return ""
+
+            logging.debug(f"Recognized: {text}")
+            return text
+
+        except Exception as e:
+            logging.exception(f"Unexpected recognition error: {e}")
+            return ""
+
+        finally:
+            try:
+                requests.post(
+                    "http://127.0.0.1:5000/api/status",
+                    json={"mic": "idle"},
+                    timeout=0.25
+                )
+            except Exception:
+                pass
+
 
     # ----------------------- Command Parsing -----------------------
     @safe_call(log_message="Error executing command", speak_message=None)
@@ -881,7 +907,7 @@ class Sebas:
                     command = 'open ' + service_cmd[len('open '):].strip()
                 elif len(service_cmd) == 0 or service_cmd == 'open':
                     self.speak("What application would you like to open?")
-                    app_name = self.listen(timeout=5)
+                    app_name = self.listen(timeout=5) # type: ignore[attr-defined]
                     if app_name:
                         command = f"open {app_name}"
                     else:
@@ -1207,7 +1233,7 @@ class Sebas:
             except Exception:
                 pass
             self.speak(question)
-            response = self.listen(timeout=7, phrase_time_limit=5)
+            response = self.listen(timeout=7, phrase_time_limit=5) # type: ignore[attr-defined]
             return any(w in (response or "").lower() for w in ["yes", "yep", "confirm", "do it", "proceed", "affirmative"])
         except Exception:
             logging.exception("Confirmation check failed.")
@@ -2424,7 +2450,7 @@ if __name__ == "__main__":
                 return
         # Otherwise, do two-step prompt then listen
         assistant.speak("How may I be of service, " + assistant.get_salutation() + "?")
-        command = assistant.listen(timeout=10, phrase_time_limit=20)
+        command = assistant.listen(timeout=10, phrase_time_limit=20) # type: ignore[attr-defined]
         if command:
             assistant.parse_and_execute(command)
     wake_detector = WakeWordDetector(
