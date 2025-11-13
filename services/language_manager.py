@@ -66,3 +66,6 @@ class LanguageManager:
     def current_languagee(self) -> str:
         """Legacy alias for current language getter."""
         return self.current_language
+    def get_iso3(self) -> str:
+        mapping = {"en": "eng", "ru": "rus", "de": "deu"}
+        return mapping.get(self.current_language, "eng")

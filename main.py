@@ -251,7 +251,8 @@ class Sebas:
         self.recognizer = sr.Recognizer()
         # Microphone selection is index-only; device is opened lazily inside context managers
         self.microphone_device_index = self.select_microphone_index()
-        self.tts_engine = pyttsx3.init()
+        from services.voice_engine import VoiceEngineManager
+        self.tts_engine = VoiceEngineManager()
         self.system = platform.system()
         # Ensure exclusive access to audio I/O across threads
         self.audio_lock = threading.RLock()
@@ -292,24 +293,7 @@ class Sebas:
                 skills_dir = 'skills'
             self.skill_registry = SkillRegistry(self, skills_dir=skills_dir)
             self.skill_registry.load_skill_preferences()
-            # Language & Voice engine (ElevenLabs with fallback)
-            try:
-                # Provide ElevenLabs API key from prefs if available
-                try:
-                    if not os.environ.get('5ec90518816581f7365464c02f4a7b6567b73d25195c90b8cd35f907d5d5dd38'):
-                        pref_key = self.prefs.get_pref('5ec90518816581f7365464c02f4a7b6567b73d25195c90b8cd35f907d5d5dd38', None)
-                        if isinstance(pref_key, str) and pref_key.strip():
-                            os.environ['5ec90518816581f7365464c02f4a7b6567b73d25195c90b8cd35f907d5d5dd38'] = pref_key.strip()
-                except Exception:
-                    pass
-                self.language_manager = LanguageManager()
-                self.voice_engine = VoiceEngineManager()
-                logging.info(f"Voice engine ready: {type(self.voice_engine.current_engine).__name__}")
-                logging.info(f"Initial language: {self.language_manager.get_current_language_name()}")
-            except Exception:
-                self.language_manager = None
-                self.voice_engine = None
-           
+        
             # Phase 2: Initialize service and process managers
             try:
                 from integrations.windows_service_manager import WindowsServiceManager
@@ -422,10 +406,8 @@ class Sebas:
             logging.exception("Failed to initialize AD client")
             self.ad_client = None
         # TTS configuration: refined British butler voice
-        try:
-            self.configure_butler_tts()
-        except Exception:
-            logging.exception("Failed to configure TTS")
+        self.tts_engine.speak("Sebas online.")
+
         # Notes and screenshots
         self.notes_file = os.path.join(os.path.expanduser('~'), 'sebas_notes.txt')
         self.screenshots_folder = os.path.join(os.path.expanduser('~'), 'Pictures', 'Screenshots')
@@ -497,7 +479,7 @@ class Sebas:
                 try:
                     lm = getattr(self, 'language_manager', None)
                     if lm is not None:
-                        lang = lm.current_language()
+                        lang = lm.get_iso3()
                 except Exception:
                     pass
                 used_custom_engine = False
@@ -522,8 +504,7 @@ class Sebas:
                             self.tts_engine.setProperty('volume', v)
                     except Exception:
                         pass
-                    self.tts_engine.say(text)
-                    self.tts_engine.runAndWait()
+                    self.tts_engine.speak(text)
             # For proactive suggestions, wait a bit for user response
             if proactive:
                 time.sleep(2) # Give user time to respond
@@ -677,31 +658,31 @@ class Sebas:
         except Exception:
             logging.exception("Failed to set TTS language")
             return False
-    def configure_butler_tts(self):
-        # Select best voice and set properties (rate, volume, pitch if supported)
-        try:
-            best_id = self._select_best_voice_id()
-            if best_id:
-                self.tts_engine.setProperty('voice', best_id)
-        except Exception:
-            logging.exception("Voice selection failed; continuing with default")
-        try:
-            self.tts_engine.setProperty('rate', 160)
-        except Exception:
-            pass
-        try:
-            self.tts_engine.setProperty('volume', 0.9)
-        except Exception:
-            pass
-        # Pitch support is driver-dependent; try common keys and ignore failures
-        self._pitch_supported = False
-        for key, val in [('pitch', -3), ('voice_pitch', -3), ('pitchPercent', 0.8)]:
-            try:
-                self.tts_engine.setProperty(key, val)
-                self._pitch_supported = True
-                break
-            except Exception:
-                continue
+    # def configure_butler_tts(self):
+    #     # Select best voice and set properties (rate, volume, pitch if supported)
+    #     try:
+    #         best_id = self._select_best_voice_id()
+    #         if best_id:
+    #             self.tts_engine.setProperty('voice', best_id)
+    #     except Exception:
+    #         logging.exception("Voice selection failed; continuing with default")
+    #     try:
+    #         self.tts_engine.setProperty('rate', 160)
+    #     except Exception:
+    #         pass
+    #     try:
+    #         self.tts_engine.setProperty('volume', 0.9)
+    #     except Exception:
+    #         pass
+    #     # Pitch support is driver-dependent; try common keys and ignore failures
+    #     self._pitch_supported = False
+    #     for key, val in [('pitch', -3), ('voice_pitch', -3), ('pitchPercent', 0.8)]:
+    #         try:
+    #             self.tts_engine.setProperty(key, val)
+    #             self._pitch_supported = True
+    #             break
+    #         except Exception:
+    #             continue
     def _select_best_voice_id(self):
         voices_list = self.tts_engine.getProperty('voices')
         if not voices_list or not isinstance(voices_list, (list, tuple)):

@@ -1,77 +1,88 @@
-# -*- coding: utf-8 -*-
+"""
+Voice Engine Manager — Piper-only (male voices).
+"""
+
 import logging
+from typing import Optional, List
+from abc import ABC, abstractmethod
+
+try:
+    import pyttsx3
+    PYTTSX3_AVAILABLE = True
+except Exception:
+    PYTTSX3_AVAILABLE = False
+
+from services.voice_engine_piper import PiperVoiceEngine
 
 
-class VoiceProfile:
-    def __init__(self, name, rate=160, volume=0.9, pitch_delta=None):
-        self.name = name
-        self.rate = rate
-        self.volume = volume
-        self.pitch_delta = pitch_delta  # driver dependent
+class BaseVoiceEngine(ABC):
+    @abstractmethod
+    def speak(self, text: str, language: str = "en") -> bool: ...
+    @abstractmethod
+    def get_available_languages(self) -> List[str]: ...
 
 
-DEFAULT_PROFILES = {
-    "butler": VoiceProfile("butler", rate=160, volume=0.9, pitch_delta=-3),
-    "professional": VoiceProfile("professional", rate=170, volume=0.92, pitch_delta=0),
-    "friendly": VoiceProfile("friendly", rate=185, volume=1.0, pitch_delta=2),
-    "technical": VoiceProfile("technical", rate=175, volume=0.95, pitch_delta=-1),
-}
+class FallbackVoiceEngine(BaseVoiceEngine):
+    def __init__(self):
+        if not PYTTSX3_AVAILABLE:
+            raise RuntimeError("pyttsx3 not available")
+        self.engine = pyttsx3.init()  # type: ignore
+        self.engine.setProperty("rate", 150)
 
-
-class VoiceManager:
-    def __init__(self, tts_engine, profiles=None):
-        self.engine = tts_engine
-        self.profiles = profiles or DEFAULT_PROFILES
-        self.current = "butler"
-        self._pitch_supported_keys = ["pitch", "voice_pitch", "pitchPercent"]
-
-    def set_profile(self, profile_name):
-        key = (profile_name or "").strip().lower()
-        if key not in self.profiles:
-            raise ValueError("Unknown voice profile")
-        self.current = key
-        self.apply_current()
-        return key
-
-    def apply_current(self):
-        p = self.profiles[self.current]
+    def speak(self, text: str, language: str = "en") -> bool:
         try:
-            self.engine.setProperty("rate", int(p.rate))
+            self.engine.say(text)
+            self.engine.runAndWait()
+            return True
         except Exception:
-            pass
-        try:
-            self.engine.setProperty("volume", float(p.volume))
-        except Exception:
-            pass
-        if p.pitch_delta is not None:
-            for k in self._pitch_supported_keys:
-                try:
-                    self.engine.setProperty(k, p.pitch_delta)
-                    break
-                except Exception:
-                    continue
+            logging.exception("[Fallback] TTS error")
+            return False
 
-    def adjust(self, rate=None, volume=None, pitch_delta=None):
-        # Adjust current profile and apply immediately
-        p = self.profiles[self.current]
-        if rate is not None:
-            try:
-                p.rate = int(rate)
-            except Exception:
-                logging.debug("Invalid rate value for adjust", exc_info=True)
-        if volume is not None:
-            try:
-                p.volume = max(0.0, min(1.0, float(volume)))
-            except Exception:
-                logging.debug("Invalid volume value for adjust", exc_info=True)
-        if pitch_delta is not None:
-            try:
-                p.pitch_delta = int(pitch_delta)
-            except Exception:
-                logging.debug("Invalid pitch value for adjust", exc_info=True)
-        self.apply_current()
-
-    def list_profiles(self):
-        return list(self.profiles.keys())
+    def get_available_languages(self) -> List[str]:
+        return ["en"]
 
 
+class VoiceEngineManager:
+    """Primary Piper, optional pyttsx3 fallback."""
+
+    primary: Optional[PiperVoiceEngine]
+    fallback: Optional[FallbackVoiceEngine]
+
+    def __init__(self):
+        self.primary = PiperVoiceEngine()
+        self.fallback = FallbackVoiceEngine() if PYTTSX3_AVAILABLE else None
+        logging.info("[Manager] Piper ready. Fallback: %s", bool(self.fallback))
+
+    @property
+    def current_engine(self):
+        return self.primary or self.fallback
+
+    def speak(self, text: str, language: str = "en") -> bool:
+        eng = self.current_engine
+        if not eng:
+            return False
+        ok = eng.speak(text, language)  # type: ignore[attr-defined]
+        if not ok and self.fallback and eng is not self.fallback:
+            logging.info("[Manager] Switching to fallback TTS.")
+            return self.fallback.speak(text, language)
+        return ok
+
+    def get_supported_languages(self) -> List[str]:
+        eng = self.current_engine
+        return eng.get_available_languages() if eng else ["en"]
+
+    # pyttsx3 compatibility shims (safe no-ops if fallback absent)
+    def setProperty(self, name: str, value):
+        e = getattr(getattr(self, "fallback", None), "engine", None)
+        if e and hasattr(e, "setProperty"):
+            return e.setProperty(name, value)
+
+    def getProperty(self, name: str):
+        e = getattr(getattr(self, "fallback", None), "engine", None)
+        if e and hasattr(e, "getProperty"):
+            return e.getProperty(name)
+
+    def stop(self):
+        e = getattr(getattr(self, "fallback", None), "engine", None)
+        if e and hasattr(e, "stop"):
+            return e.stop()
