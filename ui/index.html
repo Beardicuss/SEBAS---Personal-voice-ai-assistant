@@ -319,7 +319,7 @@
     .panel-circle.left { left: 7%; }
     .panel-circle.right { right: 7%; }
 
-    /* Left/right stacked widgets (graphs etc.) */
+    /* Left/right stacked widgets */
     .side-stack {
       position: absolute;
       width: 230px;
@@ -382,7 +382,6 @@
       opacity: 0.8;
     }
 
-    /* Tiny text block for nonsense data */
     .data-block {
       margin-top: 4px;
       color: rgba(0,255,255,0.65);
@@ -390,7 +389,7 @@
       font-size: 0.6rem;
     }
 
-    /* Bottom scanning strip & bars */
+    /* Bottom scanning strip */
     .scan-strip {
       position: absolute;
       bottom: 60px;
@@ -433,7 +432,7 @@
       100% { background-position: 100% 0; }
     }
 
-    /* Equalizer at bottom main area */
+    /* Equalizer bars */
     .data-lines {
       position: absolute;
       bottom: 100px;
@@ -512,7 +511,7 @@
       box-shadow: 0 0 10px #0ff;
     }
 
-    /* Response text above console */
+    /* Response box */
     .response-box {
       position: absolute;
       bottom: 44px;
@@ -559,7 +558,7 @@
       z-index: 2;
     }
 
-    /* Responsive-ish */
+    /* Responsive */
     @media (max-width: 900px) {
       .top-strip { display: none; }
       .panel-circle { display: none; }
@@ -690,53 +689,69 @@
 
   <script>
     (() => {
-  const API_URL = "http://127.0.0.1:5002/api/parse"; // Sebas backend
+      const API_URL = "http://127.0.0.1:5002/api/v1/parse";
+      
+      const form = document.getElementById("console");
+      const input = document.getElementById("command");
+      const responseBox = document.getElementById("response-box");
+      const core = document.getElementById("core");
+      const barsContainer = document.getElementById("bars");
 
-  const form = document.getElementById("console");
-  const input = document.getElementById("command");
-  const responseBox = document.getElementById("response-box");
-  const core = document.getElementById("core");
-  const barsContainer = document.getElementById("bars");
-  const bars = Array.from(barsContainer.querySelectorAll(".bar"));
+      let isProcessing = false;
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const cmd = input.value.trim();
-    if (!cmd) return;
+      // Create bars for animation (if element exists)
+      const bars = barsContainer ? Array.from(barsContainer.querySelectorAll(".bar")) : [];
 
-    // --- Visual feedback ---
-    core.classList.remove("core-boost");
-    void core.offsetWidth;
-    core.classList.add("core-boost");
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const cmd = input.value.trim();
+        if (!cmd || isProcessing) return;
 
-    bars.forEach((bar) => {
-      bar.classList.add("spike");
-      setTimeout(() => bar.classList.remove("spike"), 400);
-    });
+        isProcessing = true;
 
-    responseBox.textContent = "> Processing...";
-    responseBox.style.opacity = 1;
-    responseBox.style.animation = "glitchText 1.4s infinite";
+        // Visual feedback
+        core.classList.remove("core-boost");
+        void core.offsetWidth;
+        core.classList.add("core-boost");
 
-    // --- Backend request ---
-    try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: cmd }),
+        bars.forEach((bar) => {
+          bar.classList.add("spike");
+          setTimeout(() => bar.classList.remove("spike"), 400);
+        });
+
+        responseBox.textContent = "> Processing...";
+        responseBox.style.opacity = 1;
+        responseBox.style.animation = "glitchText 1.4s infinite";
+
+        // Backend request
+        try {
+          const res = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: cmd }),
+          });
+
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+
+          const data = await res.json();
+          const msg = data?.response || data?.message || "No response";
+          responseBox.textContent = "> " + cmd.toUpperCase() + " :: " + msg;
+        } catch (err) {
+          console.error("Fetch error:", err);
+          responseBox.textContent = "> " + cmd.toUpperCase() + " :: connection error";
+        } finally {
+          isProcessing = false;
+          input.value = "";
+          
+          // Reset animation after 3 seconds
+          setTimeout(() => {
+            responseBox.style.animation = "";
+          }, 3000);
+        }
       });
-
-      const data = await res.json();
-      const msg = data?.response || data?.message || "No response";
-      responseBox.textContent = "> " + cmd.toUpperCase() + " :: " + msg;
-    } catch (err) {
-      console.error("Fetch error:", err);
-      responseBox.textContent = "> " + cmd.toUpperCase() + " :: connection error";
-    }
-
-    input.value = "";
-  });
-})();
+    })();
   </script>
 </body>
 </html>
