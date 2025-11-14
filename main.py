@@ -17,7 +17,7 @@ from .stt.stt_manager import STTManager
 from .tts.tts_manager import TTSManager
 
 # === Wake Word Module ===
-from .wakeword.simple_wakeword import WakeWordDetector
+from .wakeword.wakeword_detector import WakeWordDetector
 
 # === UI & API ===
 from .api.ui_server import start_ui_server

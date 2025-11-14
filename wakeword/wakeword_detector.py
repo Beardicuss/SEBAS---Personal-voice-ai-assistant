@@ -1,197 +1,107 @@
-"""
-Hybrid Wake Word Detector for SEBAS
-Supports:
-    - Porcupine (fast, classical)
-    - OpenWakeWord (modern neural engine)
-    - Hybrid modes:
-        * hybrid_or   – trigger if ANY detects
-        * hybrid_and  – trigger only if BOTH detect
-"""
-
 import logging
-import numpy as np
+import threading
 import sounddevice as sd
-from threading import Thread, Event
+import numpy as np
+import queue
+import time
+from vosk import Model, KaldiRecognizer
 
-# External wake-word engines
-try:
-    import pvporcupine
-except Exception:
-    pvporcupine = None
-
-try:
-    from openwakeword.model import Model as OWWModel
-except Exception:
-    OWWModel = None
+"""
+Wake word detector using:
+    - live microphone input
+    - Vosk speech-to-text
+    - keyword matching in recognized text
+    
+Keyword: "sebas"
+"""
 
 
 class WakeWordDetector:
-    """
-    Main wake-word engine wrapper.
-    Modes:
-        - porcupine
-        - openwakeword
-        - hybrid_or
-        - hybrid_and
-    """
-
-    def __init__(
-        self,
-        porcupine_keyword: str = "hey computer",
-        oww_model_name: str = "hey_sebas",
-        mode: str = "hybrid_and",
-        sensitivity: float = 0.6,
-        callback=None,
-    ):
-        self.mode = mode
+    def __init__(self, callback, keyword="sebas"):
         self.callback = callback
-        self.running = False
-        self.stop_event = Event()
+        self.keyword = keyword.lower()
 
-        # Audio params
-        self.sample_rate = 16000
-        self.frame_length = 512
-
-        # ---------------------------------------------------------
-        # Load Porcupine
-        # ---------------------------------------------------------
-        self.porcupine = None
-        if pvporcupine:
-            try:
-                self.porcupine = pvporcupine.create(
-                    keywords=[porcupine_keyword],
-                    sensitivities=[sensitivity],
-                )
-                logging.info(f"[WakeWord] Porcupine loaded: {porcupine_keyword}")
-            except Exception as e:
-                logging.error(f"[WakeWord] Porcupine failed: {e}")
-        else:
-            logging.warning("[WakeWord] Porcupine not installed")
-
-        # ---------------------------------------------------------
-        # Load OpenWakeWord
-        # ---------------------------------------------------------
-        self.oww = None
-        self.oww_model_name = oww_model_name
-
-        if OWWModel:
-            try:
-                self.oww = OWWModel()
-                logging.info(f"[WakeWord] OpenWakeWord loaded ({oww_model_name})")
-            except Exception as e:
-                logging.error(f"[WakeWord] OpenWakeWord failed: {e}")
-        else:
-            logging.warning("[WakeWord] OpenWakeWord not installed")
-
-        # If neither engine works, warn the user
-        if not self.porcupine and not self.oww:
-            logging.error("[WakeWord] NO wake-word engines available!")
-
-    # ============================================================
-    # Internal listener loop
-    # ============================================================
-    def _listen_loop(self):
+        # Load tiny Vosk English model for keyword detection
         try:
-            stream = sd.InputStream(
-                channels=1,
-                samplerate=self.sample_rate,
-                blocksize=self.frame_length,
-                dtype="int16",
-            )
-        except Exception as e:
-            logging.error(f"[WakeWord] Failed to open microphone: {e}")
+            self.model = Model("vosk-model-small-en-us")
+            self.recognizer = KaldiRecognizer(self.model, 16000)
+            logging.info("[WakeWord] Vosk keyword engine loaded.")
+        except Exception:
+            logging.exception("[WakeWord] Failed to load tiny Vosk model.")
+            self.model = None
+            self.recognizer = None
+
+        self.running = False
+        self.thread = None
+
+    def start(self):
+        if not self.model:
+            logging.warning("[WakeWord] No model; wake word disabled.")
             return
 
-        with stream:
-            logging.info("[WakeWord] Listening thread started")
-
-            while not self.stop_event.is_set():
-                try:
-                    pcm_bytes, _ = stream.read(self.frame_length)
-                    pcm = np.frombuffer(pcm_bytes, dtype=np.int16)
-                except Exception as e:
-                    logging.error(f"[WakeWord] Audio capture error: {e}")
-                    continue
-
-                # Flags
-                detected_ppn = False
-                detected_oww = False
-
-                # ------------------- Porcupine -------------------
-                if self.porcupine:
-                    try:
-                        res = self.porcupine.process(pcm)
-                        if res >= 0:
-                            detected_ppn = True
-                    except Exception:
-                        pass
-
-                # ------------------- OpenWakeWord ----------------
-                if self.oww:
-                    try:
-                        scores = self.oww.predict(pcm)
-                        if scores.get(self.oww_model_name, 0.0) > 0.6:
-                            detected_oww = True
-                    except Exception:
-                        pass
-
-                # ------------------- MODE LOGIC ------------------
-                fire = False
-
-                if self.mode == "porcupine":
-                    fire = detected_ppn
-
-                elif self.mode == "openwakeword":
-                    fire = detected_oww
-
-                elif self.mode == "hybrid_or":
-                    fire = detected_ppn or detected_oww
-
-                elif self.mode == "hybrid_and":
-                    fire = detected_ppn and detected_oww
-
-                # ------------------- FIRE EVENT ------------------
-                if fire:
-                    self._fire_event(
-                        detected_ppn=detected_ppn,
-                        detected_oww=detected_oww,
-                    )
-
-    # ============================================================
-    # Trigger callback
-    # ============================================================
-    def _fire_event(self, detected_ppn=False, detected_oww=False):
-        if self.callback:
-            try:
-                self.callback(
-                    {
-                        "porcupine": detected_ppn,
-                        "openwakeword": detected_oww,
-                        "mode": self.mode,
-                    }
-                )
-            except Exception:
-                logging.exception("[WakeWord] Callback failed")
-
-    # ============================================================
-    # Public API
-    # ============================================================
-    def start(self):
         if self.running:
             return
 
         self.running = True
-        self.stop_event.clear()
-
-        t = Thread(
-            target=self._listen_loop,
-            daemon=True,
-            name="WakeWordDetector",
-        )
-        t.start()
-        logging.info("[WakeWord] Detector started")
+        self.thread = threading.Thread(target=self._listen_loop, daemon=True)
+        self.thread.start()
+        logging.info("[WakeWord] Wake word detector started.")
 
     def stop(self):
-        self.stop_event.set()
         self.running = False
-        logging.info("[WakeWord] Detector stopped")
+
+    # -----------------------------------
+    # Listening loop
+    # -----------------------------------
+    def _listen_loop(self):
+        try:
+            with sd.RawInputStream(
+                samplerate=16000,
+                blocksize=8000,
+                dtype="int16",
+                channels=1,
+                callback=self._audio_callback,
+            ):
+                while self.running:
+                    time.sleep(0.1)
+        except Exception as e:
+            logging.error(f"[WakeWord] Microphone error: {e}")
+
+    # -----------------------------------
+    # Audio callback
+    # -----------------------------------
+    def _audio_callback(self, indata, frames, time_info, status):
+        if not self.recognizer:
+            return
+
+        try:
+            # Convert raw memoryview -> bytes for Vosk
+            pcm_bytes = bytes(indata)
+
+            if self.recognizer.AcceptWaveform(pcm_bytes):
+                res = self.recognizer.Result()
+            else:
+                res = self.recognizer.PartialResult()
+
+            text = self._extract_text(res)
+
+            if text and self.keyword in text:
+                logging.info("[WakeWord] Triggered!")
+                self.callback()
+
+        except Exception as e:
+            logging.error(f"[WakeWord] Audio processing error: {e}")
+
+    # -----------------------------------
+    @staticmethod
+    def _extract_text(res_json):
+        import json
+        try:
+            data = json.loads(res_json)
+            if "partial" in data:
+                return data["partial"].lower()
+            if "text" in data:
+                return data["text"].lower()
+        except Exception:
+            pass
+        return ""

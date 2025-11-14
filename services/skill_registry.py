@@ -47,7 +47,6 @@ class SkillRegistry:
         stage1_skills = [
             'sebas.skills.system_skill',
             'sebas.skills.app_skill',
-            'sebas.skills.file_skill',
             'sebas.skills.network_skill',
         ]
 
