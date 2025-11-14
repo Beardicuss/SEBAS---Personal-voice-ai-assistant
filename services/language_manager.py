@@ -1,4 +1,3 @@
-
 """
 Language Manager
 Controls:
@@ -85,9 +84,9 @@ class LanguageManager:
         if self.stt:
             self.stt.set_language(profile["stt_model"])
 
-        # Switch TTS voice
+        # Switch TTS voice via TTSManager API
         if self.tts:
-            self.tts.selector.set_voice(profile["tts_voice"])
+            self.tts.set_voice(profile["tts_voice"])
 
         return True
 

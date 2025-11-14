@@ -2,11 +2,11 @@
 TTS Manager
 
 High-level text-to-speech manager that wraps different engines:
-    - PiperTTS: primary neural TTS backend
+    - PiperTTS: primary neural TTS backend (currently pyttsx3-based wrapper)
     - SystemTTS: OS-level fallback (SAPI / system voices)
     - VoiceSelector: helper to pick voices by hint
 
-LanguageManager controls which voice should be used by calling selector.set_voice().
+LanguageManager controls which voice should be used by calling set_voice().
 """
 
 import logging
@@ -20,7 +20,7 @@ from sebas.tts.tts_selector import VoiceSelector
 class TTSManager:
     """Central unified interface for all TTS engines."""
 
-    def __init__(self, language_manager=None):
+    def __init__(self, language_manager: Optional[object] = None):
         """
         Initialize primary TTS engine and voice selector.
 
@@ -36,12 +36,12 @@ class TTSManager:
         self.language_manager = language_manager
 
         try:
-            # Primary neural TTS backend
+            # Primary backend (currently pyttsx3-based wrapper)
             self.engine = PiperTTS()
             logging.info("TTSManager: using PiperTTS backend.")
         except Exception:
             # Fallback to system TTS engine
-            logging.warning("PiperTTS unavailable, falling back to SystemTTS.")
+            logging.exception("PiperTTS unavailable, falling back to SystemTTS.")
             self.engine = SystemTTS()
 
         # Voice selector uses the currently active engine
@@ -56,7 +56,10 @@ class TTSManager:
         """
         if not text:
             return
-        self.engine.speak(text)
+        try:
+            self.engine.speak(text)
+        except Exception:
+            logging.exception("TTSManager.speak failed")
 
     def set_voice(self, voice_hint: str) -> bool:
         """
@@ -69,7 +72,11 @@ class TTSManager:
         Returns:
             True if a matching voice was found and applied, False otherwise.
         """
-        return self.selector.set_voice(voice_hint)
+        try:
+            return self.selector.set_voice(voice_hint)
+        except Exception:
+            logging.exception("TTSManager.set_voice failed")
+            return False
 
     def list_voices(self):
         """
@@ -77,7 +84,11 @@ class TTSManager:
 
         This can be used by UI or configuration panels.
         """
-        return self.engine.list_voices()
+        try:
+            return self.engine.list_voices()
+        except Exception:
+            logging.exception("TTSManager.list_voices failed")
+            return []
 
     def set_language(self, voice_hint: str) -> bool:
         """
