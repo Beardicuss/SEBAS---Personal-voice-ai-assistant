@@ -17,7 +17,7 @@ from sebas.stt.stt_manager import STTManager
 from sebas.tts.tts_manager import TTSManager
 
 # === Wake Word Module ===
-from sebas.wake_word import WakeWordDetector
+from sebas.wakeword.wakeword_detector import WakeWordDetector
 
 # === UI & API ===
 from sebas.api.ui_server import start_ui_server
@@ -69,7 +69,7 @@ class Sebas:
         self.stt = STTManager(language_manager=self.language_manager)
         self.tts = TTSManager(language_manager=self.language_manager)
 
-        # Allow language manager to influence engines
+        # Bind language manager to voice + recognition systems
         self.language_manager.bind_stt(self.stt)
         self.language_manager.bind_tts(self.tts)
 
@@ -86,14 +86,14 @@ class Sebas:
 
         logging.info("Sebas fully initialized.")
 
-        # Fire global startup event
+        # Emit startup event
         self.events.emit("core.started")
 
     # ========================================================
     #                   Speech Output
     # ========================================================
     def speak(self, text: str):
-        """Send text to TTS engine and emit event."""
+        """Send text to TTS engine and emit events."""
         if not text:
             return
 
@@ -135,7 +135,7 @@ class Sebas:
 
         self.events.emit("core.command_received", raw_command)
 
-        # Auto language detection BEFORE lowercasing
+        # Detect language BEFORE lowercasing
         self.language_manager.detect_language(raw_command)
         command = raw_command.lower().strip()
 
@@ -146,7 +146,6 @@ class Sebas:
                 .replace("language", "")
                 .strip()
             )
-
             if self.language_manager.set_language(lang):
                 self.speak(
                     f"Language set to {self.language_manager.get_current_language_name()}"
@@ -208,7 +207,10 @@ if __name__ == "__main__":
 
     assistant = Sebas()
 
+    # Start UI server
     start_ui_server()
+
+    # Start API server
     api = create_api_server(
         sebas_instance=assistant,
         host="127.0.0.1",
@@ -216,7 +218,9 @@ if __name__ == "__main__":
     )
     api.start()
 
+    # Start Sebas core
     assistant.start()
 
+    # Keep process alive
     while True:
         time.sleep(1)

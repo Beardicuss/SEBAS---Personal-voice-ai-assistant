@@ -1,5 +1,5 @@
 ===== SEBAS DIAGNOSTICS SUITE Mk.IV OMEGA =====
-Generated: 2025-11-14T14:08:30.319514
+Generated: 2025-11-14T15:41:07.474604
 
 === 1. UNUSED MODULES ===
  • ad_client
@@ -14,22 +14,19 @@ Generated: 2025-11-14T14:08:30.319514
  • calendar_client
  • cloud_sync
  • code_skill
- • commands_registry
  • compliance_manager
  • compliance_skill
  • context_manager
  • datetime_skill
  • email_client
  • enterprise_integrations
- • event_system
+ • event_bus
  • file_operations
  • file_skill
  • firewall_manager
  • intent_executor
- • intent_router
  • language_manager
  • languages
- • logging_config
  • logging_dashboard
  • main
  • monitoring_skill
@@ -39,7 +36,6 @@ Generated: 2025-11-14T14:08:30.319514
  • news_weather
  • nlu
  • nlu_enhancer
- • nlu_manager
  • nlu_skill
  • open_app_skill
  • permission_manager
@@ -48,12 +44,9 @@ Generated: 2025-11-14T14:08:30.319514
  • preferences
  • process_manager
  • rate_limit
- • run
  • script_executor
- • sebas_service
  • security_manager
  • security_skill
- • service_client
  • service_skill
  • skill_registry
  • smart_home
@@ -69,7 +62,6 @@ Generated: 2025-11-14T14:08:30.319514
  • system_skill
  • task_manager
  • task_scheduler
- • test_storage_manager
  • tts_manager
  • tts_piper
  • tts_selector
@@ -79,7 +71,7 @@ Generated: 2025-11-14T14:08:30.319514
  • voice_system
  • volume_skill
  • vpn_manager
- • wake_word
+ • wakeword_detector
  • wakeword_dummy
  • wakeword_manager
  • wakeword_porcupine
@@ -91,23 +83,17 @@ Generated: 2025-11-14T14:08:30.319514
 No circular imports.
 
 === 3. DANGEROUS CALLS ===
- • D:\SEBAS - Personal voice ai assistant\sebas\commands_registry.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\commands_registry.py uses subprocess.Popen
  • D:\SEBAS - Personal voice ai assistant\sebas\main.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\sebas_service.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\api\api_server.py uses subprocess.Popen
+ • D:\SEBAS - Personal voice ai assistant\sebas\api\api_server.py uses exec
  • D:\SEBAS - Personal voice ai assistant\sebas\api\swagger.py uses exec
  • D:\SEBAS - Personal voice ai assistant\sebas\api\webhooks.py uses exec
  • D:\SEBAS - Personal voice ai assistant\sebas\constants\permissions.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\dispatcher\intent_router.py uses exec
  • D:\SEBAS - Personal voice ai assistant\sebas\integrations\automation_engine.py uses eval
  • D:\SEBAS - Personal voice ai assistant\sebas\integrations\automation_engine.py uses exec
  • D:\SEBAS - Personal voice ai assistant\sebas\integrations\calendar_client.py uses eval
  • D:\SEBAS - Personal voice ai assistant\sebas\integrations\firewall_manager.py uses exec
  • D:\SEBAS - Personal voice ai assistant\sebas\integrations\network_manager.py uses exec
  • D:\SEBAS - Personal voice ai assistant\sebas\integrations\script_executor.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\nlp\intent_executor.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\nlp\intent_router.py uses exec
  • D:\SEBAS - Personal voice ai assistant\sebas\services\skill_registry.py uses exec
  • D:\SEBAS - Personal voice ai assistant\sebas\skills\app_skill.py uses subprocess.Popen
  • D:\SEBAS - Personal voice ai assistant\sebas\skills\automation_skill.py uses exec
@@ -116,17 +102,14 @@ No circular imports.
  • D:\SEBAS - Personal voice ai assistant\sebas\skills\file_skill.py uses exec
  • D:\SEBAS - Personal voice ai assistant\sebas\skills\nlu_skill.py uses exec
  • D:\SEBAS - Personal voice ai assistant\sebas\skills\open_app_skill.py uses subprocess.Popen
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\security_skill.py uses eval
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\security_skill.py uses exec
 
 === 4. MISSING __init__.py ===
- • D:\SEBAS - Personal voice ai assistant\sebas\audio
+ • D:\SEBAS - Personal voice ai assistant\sebas\events
 
 === 5. FUNCTION SPEED (Mk.II) ===
 No slow functions detected.
 
 === 6. MINI AI ARCHITECTURE REVIEW (Mk.III) ===
- • D:\SEBAS - Personal voice ai assistant\sebas\sebas_service.py: God-object detected: class SebasService has 16 methods.
  • D:\SEBAS - Personal voice ai assistant\sebas\integrations\automation_engine.py: God-object detected: class AutomationEngine has 16 methods.
  • D:\SEBAS - Personal voice ai assistant\sebas\integrations\smart_home.py: God-object detected: class HomeAssistantClient has 17 methods.
  • D:\SEBAS - Personal voice ai assistant\sebas\skills\automation_skill.py: File extremely large (>800 lines). Consider refactoring.
@@ -134,7 +117,4 @@ No slow functions detected.
  • D:\SEBAS - Personal voice ai assistant\sebas\skills\code_skill.py: God-object detected: class CodeSkill has 27 methods.
  • D:\SEBAS - Personal voice ai assistant\sebas\skills\file_skill.py: File extremely large (>800 lines). Consider refactoring.
  • D:\SEBAS - Personal voice ai assistant\sebas\skills\file_skill.py: God-object detected: class FileSkill has 43 methods.
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\network_skill.py: God-object detected: class NetworkSkill has 27 methods.
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\security_skill.py: God-object detected: class SecuritySkill has 18 methods.
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\smart_home_skill.py: God-object detected: class SmartHomeSkill has 21 methods.
 

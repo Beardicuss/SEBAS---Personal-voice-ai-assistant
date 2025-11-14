@@ -1,7 +1,7 @@
 =============================================
          SEBAS PROJECT STRUCTURE Mk.I
 =============================================
-Generated: 2025-11-14T14:43:41.993561
+Generated: 2025-11-14T15:34:05.732956
 
 ├── .git
 │   ├── COMMIT_EDITMSG
@@ -51,7 +51,8 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   ├── 03
 │   │   │   └── 48324efa4b946477a275e0fd88b1952bf797be
 │   │   ├── 04
-│   │   │   └── 6d7c0d8bc1e7fa2023a5758d4e5ecb30d35a06
+│   │   │   ├── 6d7c0d8bc1e7fa2023a5758d4e5ecb30d35a06
+│   │   │   └── 9a8f6d23729d704186706712e280a1e0a0ce35
 │   │   ├── 05
 │   │   │   ├── 6e43b73e6c7a94bcd1cc8415797c6a2ccbc560
 │   │   │   └── b0b45897eff453dabd54560c8550d7f5e9e7be
@@ -62,7 +63,8 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   └── e93b587336322001c9a5061ac24c4a301b52f9
 │   │   ├── 08
 │   │   │   ├── 1f9c0f8b52de86f5d684ddd41ee713477934e8
-│   │   │   └── 396ba311fa695ba078e325afefb7fa91ecc242
+│   │   │   ├── 396ba311fa695ba078e325afefb7fa91ecc242
+│   │   │   └── d1afa993e24c8192d0204a8cc6269a3c11b1c6
 │   │   ├── 09
 │   │   │   ├── 2aa6299cd773e9858054fb40d391b4f4b9474f
 │   │   │   └── 81669cf15e124194992d430ffc155ff8087c92
@@ -95,12 +97,14 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   └── 554be9806b88ff223d63eb61768ea737025b57
 │   │   ├── 14
 │   │   │   ├── 40f7e11b899c1ea0f94b5963c9e5a8631f0a8c
+│   │   │   ├── b0ae804f909747e2b7455bc22ca59f1ec5036d
 │   │   │   ├── c95d9816751826a6a34141bef6626ba3e40372
 │   │   │   └── f69cca49ee919cf7d2071b62d591d6a1957f98
 │   │   ├── 15
 │   │   │   ├── 6552ad1c6bf85d5023b814588fad7bfc5c5a1a
 │   │   │   └── 9597dee51ca7788a1064a881e640ca19ea7853
 │   │   ├── 16
+│   │   │   ├── 953008c4dd1ca790b7e107c4cf90be6b0c7a48
 │   │   │   └── fae03d0df47a71d00b4a89f19d6f91b511e0e5
 │   │   ├── 17
 │   │   │   ├── 13012f6a29337aa0a8266b3180605447180d85
@@ -136,9 +140,11 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   ├── 78726b334d77f8925681c914ccacd73d06634d
 │   │   │   └── ff8010010b826fcfbed4fcd5cf7e38598588fa
 │   │   ├── 20
+│   │   │   ├── 0869c660a62f6b270b9c9e1cb173860eba5fd8
 │   │   │   ├── 67c3cac4c0d790043c640d9d7ca5798c87346a
 │   │   │   └── fa04e0320f2249a5b952907b117e121d0eeaa0
 │   │   ├── 21
+│   │   │   ├── 1d07e0ac85ec25f221ef93987b28e0bbe47f04
 │   │   │   ├── 2f7189204bc5457efac565340f883974b452a0
 │   │   │   └── 4046e8878a0e9d25bcbdcc89a197fe9e21cc6a
 │   │   ├── 22
@@ -150,7 +156,8 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   └── b2351a3e743ce96f2bbb323d5efb45c725bb5c
 │   │   ├── 25
 │   │   │   ├── b25b58953d1bf272ee047b36e70b57612e3f25
-│   │   │   └── ca52a98631ca7052d4bfd4147f0e7252ccbc58
+│   │   │   ├── ca52a98631ca7052d4bfd4147f0e7252ccbc58
+│   │   │   └── f67418d6ce5b582133ac1c6d71506c03863c29
 │   │   ├── 26
 │   │   │   ├── 0c0451018f6e9f77ca1721a1a681bc73af5089
 │   │   │   ├── 685fc020466a7e9d80b801ab29bde6adb95a0d
@@ -159,9 +166,11 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   ├── 27
 │   │   │   └── 777f7b18d83c154af04347d175073a595bdcd7
 │   │   ├── 28
+│   │   │   ├── 0a212799ef710f07568f95fed0e928242b979f
 │   │   │   └── ab2ab5a3e2a0f96fffedc89b0d95476bd0b5b9
 │   │   ├── 29
-│   │   │   └── 4b9fe59e0ef3caa0c72074fc0a95464f4174a8
+│   │   │   ├── 4b9fe59e0ef3caa0c72074fc0a95464f4174a8
+│   │   │   └── 7ad99101d58d88147e41d01323dca9f6edfe28
 │   │   ├── 2a
 │   │   │   ├── 116ae333a667291544912881da344945d0f3a1
 │   │   │   └── 575921f6dd8e5d4abb558a7d9f4244a0e05514
@@ -174,6 +183,7 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   └── 3784fded42aa53b5a3bc1850bada2c12c8b647
 │   │   ├── 2d
 │   │   │   ├── 145cc031da0aaac43be8acf9d96664e4e442bb
+│   │   │   ├── 22b0aed84efad291be752e422904db8e72993b
 │   │   │   └── 67ef6dfa8757412a0bd9c3a622743287ec533d
 │   │   ├── 2e
 │   │   │   ├── 169cc06a3f979e5dcee2a3c06eefed67ee6992
@@ -221,6 +231,7 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   ├── 3c
 │   │   │   └── 5404008f4ed27132d619ab8059362bf06ff38d
 │   │   ├── 3d
+│   │   │   ├── 303f3e3c3d48891d44c3ac3bae515aab857600
 │   │   │   └── e8a24d01c925360597bde1689940fc8909e98f
 │   │   ├── 3e
 │   │   │   └── 85de40d095bf44ce47855937be285ab0b37d32
@@ -228,6 +239,8 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   ├── 009005bdf74fc0069dd778cba7a0308ce0dc2d
 │   │   │   ├── 049084f1e24c6529167dc304ce3b5aef1f1591
 │   │   │   └── 3326df06bd29639c039729cbd2891a41467548
+│   │   ├── 40
+│   │   │   └── 70198a2155e3cfefbc303dd4bd45b3a50323b8
 │   │   ├── 41
 │   │   │   └── d5f9ef66d84c66451b38df40aeae8bb5c96e27
 │   │   ├── 42
@@ -250,11 +263,13 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   ├── 47
 │   │   │   ├── 118776b81b44406e593f2768b3cffdb92f27d6
 │   │   │   ├── 5567336e18c21565ccc3163239b710d88ac957
-│   │   │   └── 573345af2b11468c78be91a3444324ae120f71
+│   │   │   ├── 573345af2b11468c78be91a3444324ae120f71
+│   │   │   └── 8cd0b504cb811a67da1c283b6116a84f3cf5bc
 │   │   ├── 48
 │   │   │   └── 6a4a5407070fcfae67127a970634967f40cb80
 │   │   ├── 49
 │   │   │   ├── 1f8c3f893b3779a4bf1e8a57b53f7a62955e9d
+│   │   │   ├── 2c5a428b24b21cee271b0bbc517af26b5c5e4b
 │   │   │   ├── 90bd6763079f2af13e8cc71c678c025c919a6f
 │   │   │   ├── ec17e92ba1f1969e29d07af9fbc45ba0bd82dd
 │   │   │   └── fb3bf8f8a535e39878093a4ba88533d191ec5f
@@ -293,9 +308,11 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   ├── 55
 │   │   │   ├── 2e240a13682f660f947dcc2d29eb8ac17de288
 │   │   │   ├── 854031435c53383767e2869048813803195a3f
-│   │   │   └── 930fe6b2a2904c821dcfa78303132893769f01
+│   │   │   ├── 930fe6b2a2904c821dcfa78303132893769f01
+│   │   │   └── bd2d76b36aa5d8df004cab285ac5c6102c93d2
 │   │   ├── 57
-│   │   │   └── 1ede0df0b146c2d35bf2fdf334156ea1207042
+│   │   │   ├── 1ede0df0b146c2d35bf2fdf334156ea1207042
+│   │   │   └── df0306d191e81aeb539088cf0aa3e99f5e1afc
 │   │   ├── 58
 │   │   │   ├── bc62ee9dabc090ea4dd44c079dff23c14ab007
 │   │   │   └── ebfdd94dfbb260dd7a0f0a022fe7415758fede
@@ -318,13 +335,15 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   ├── 77aa6ae4470732dd772b983b3af9047fe77ee2
 │   │   │   └── 8c5973c41816dce1b9912161d2301b1def460e
 │   │   ├── 5e
-│   │   │   └── 1bddea8cbba93472d88b2fa450db8746e1fdca
+│   │   │   ├── 1bddea8cbba93472d88b2fa450db8746e1fdca
+│   │   │   └── d51d454bfb87cc2ab5982a938235e40731fe19
 │   │   ├── 5f
 │   │   │   ├── 22f8b5f3093370ba49f93e1c5cc2b1dfc68231
 │   │   │   └── 742bdcd360a9c1a426ff228ee65ce38fc734ff
 │   │   ├── 60
 │   │   │   ├── 1e75b42f17ceb563c475967e23060571c7bab4
 │   │   │   ├── 7013a11708dba5cd75c6154a3dffbf3be09833
+│   │   │   ├── 7a7ff7f8ca5b40e0d70b43af8c00d0ca644339
 │   │   │   └── da951c042155136a3044e86ca24b2054170d73
 │   │   ├── 61
 │   │   │   ├── 1c98e392aac01f79c1576604add99db1f4b9d2
@@ -362,6 +381,7 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   ├── 022654bc5f7ac7207cd6faa9ddbd070fd4190a
 │   │   │   └── 790565733ba6500031f958355756b5d873fc6f
 │   │   ├── 6f
+│   │   │   ├── 42ad88bbb8e6fff9cac439b37af694c53068d4
 │   │   │   ├── 965c77ac45f739f18ca908fdab6f8028c31ccc
 │   │   │   └── c09f7f331a0e29fe081b0917b1b9fdb286dbab
 │   │   ├── 70
@@ -383,6 +403,7 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   ├── 76
 │   │   │   ├── 27903bd17e76372a6ec4bdec6c9a06ddc4d167
 │   │   │   ├── 2dde2fa66da8174cbfc9dfd6114677c12517fd
+│   │   │   ├── 9eaf56e707583a69c9cb21bb9009bcf5b943b8
 │   │   │   ├── b3bfa0b52e8f381485319e1de45661512d5da1
 │   │   │   ├── ccbd3b2b13ce77f623c738ddf47ddd86f36626
 │   │   │   └── f58207b79525a9478f9a0fdc4ed6a1f05749e2
@@ -391,7 +412,10 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   └── ba623a2057cf3859ef4989c972a11b7d0174b4
 │   │   ├── 78
 │   │   │   ├── cba80dcf5ae74f3c4b9a72cc620378579c395c
+│   │   │   ├── eb7a9a3e5e7773d246c414597ec7e16462711a
 │   │   │   └── f736e13e34d134399c7d2b5578bfbe3d9091ff
+│   │   ├── 79
+│   │   │   └── 762f4c9d66fbbbfb3de6fba971ba10f9b2b6a8
 │   │   ├── 7a
 │   │   │   ├── 40b09720262226667d92c39046dd386ab26a23
 │   │   │   ├── ba8eb1f50822f3d3c3675b1a4f272eae7d3d27
@@ -403,6 +427,7 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   ├── 5df8aac7c5e80314d91889eec7f383ca941f5f
 │   │   │   └── 8a4941868b990ef399f08e65f0ee1431397970
 │   │   ├── 7e
+│   │   │   ├── 6368fb06ade7540fca7afa96cbd7840dd1b96f
 │   │   │   └── a05a1e2fd9e86a519739fc8cefa654116f36fe
 │   │   ├── 7f
 │   │   │   ├── 22a20cec96a3b791e53ae6bb4bde3d66ed408d
@@ -413,6 +438,7 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   ├── 795c2e2249de22a91fc770fed7f69b0d9ee981
 │   │   │   └── 7d35d75490bc472eef05909f8b3b1167f75b1d
 │   │   ├── 81
+│   │   │   ├── 5e552162937f0bbe6f9010ca0624185e51e3ea
 │   │   │   └── 8c0eee779dcf5c8e3b5dbf0470090975f7e2ac
 │   │   ├── 83
 │   │   │   ├── 40e0293b0aea263a3e036ce81ac015a5c99c20
@@ -432,7 +458,8 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   ├── a64f5ad65955578928cd5caa155057558602b3
 │   │   │   └── cf47ceea74dba792a5454d853f58bc63ee6e04
 │   │   ├── 87
-│   │   │   └── 56778ccf295d200be88e3fd2803f4eeb0301f8
+│   │   │   ├── 56778ccf295d200be88e3fd2803f4eeb0301f8
+│   │   │   └── cefc3e209bcead4420386a34ee53cbd869c874
 │   │   ├── 88
 │   │   │   ├── 92ce78b5d43e6cfe5c31fdc58a9316e51d1b68
 │   │   │   └── c359ac503846897252f4d1bde8623789460d62
@@ -448,6 +475,7 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   ├── 8b
 │   │   │   ├── 00048536f7ab1e8e9d4c4e70eadf9b36ce78a6
 │   │   │   ├── 1fa5a49c09e7d9bab840508130a7894a2bccad
+│   │   │   ├── b2117dc4fe79b854ae5a748db70c51d8edb9f0
 │   │   │   └── d2c5dd38269dc95fa65a00274b4077495309f9
 │   │   ├── 8c
 │   │   │   ├── 29033dcd0233a8d975e545b4323c3d69407085
@@ -466,6 +494,7 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   ├── 90
 │   │   │   ├── 4231fc861bd4f72f5c54d3d174789c04418a36
 │   │   │   ├── 589e2d2fdb26a206af8db54f26661a0b597e33
+│   │   │   ├── ea01964f0212ff046aed471f581da125c31e13
 │   │   │   └── ffea7965299ae97c8aa0479c5693dad3f4baa2
 │   │   ├── 91
 │   │   │   └── 77b3dee762118b644715b32c2b0b438b101324
@@ -490,8 +519,11 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   └── eae284a75ddbe44aa6a0998c61fa8e82488bfc
 │   │   ├── 99
 │   │   │   ├── 5da5e23b9b540ebbb64e2d3e324880eca20395
+│   │   │   ├── 6e735d10e8b437b37b853cd7fa8828e00689c3
+│   │   │   ├── c2509ac5f21a6efba31bf67174521f3fc485ab
 │   │   │   └── db747330ad75c8a9f4a5bf081df23b1078d568
 │   │   ├── 9a
+│   │   │   ├── 262b168b2f056f8fee0f26bbc95e222e794116
 │   │   │   ├── 6e0ece5e3987bfe7ff0aadf35e8732062c50f8
 │   │   │   └── 94dc1cf9e41064bc53bb31f809fd2e48253158
 │   │   ├── 9b
@@ -515,6 +547,7 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   ├── ca45d8af817d1dcb62e6e129f900df3067e4c5
 │   │   │   └── fc1ec2ceb8128472d81db77da00b99403af23c
 │   │   ├── a0
+│   │   │   ├── 176b0d80777381a9a054ba7c1e9c5eace80155
 │   │   │   └── 6b6f7598fe2f38aa3f8cdd89a31aa7a782f8e4
 │   │   ├── a1
 │   │   │   ├── 16f417c84c9bf8727584a9b186a816e911dd63
@@ -589,7 +622,8 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   └── dd0da8df74e6482c728d33029911f2c621b258
 │   │   ├── b7
 │   │   │   ├── 6720ed0b6476186f3f56f41d148d32f5cc8d59
-│   │   │   └── 7a41e64d48ee7813d575cd1349fe3ed99f3386
+│   │   │   ├── 7a41e64d48ee7813d575cd1349fe3ed99f3386
+│   │   │   └── 9114b15ef20918e4c72a26574359bc363f9479
 │   │   ├── b9
 │   │   │   ├── 8050dc1be4e4a19135a84aa8b7636efb1e4745
 │   │   │   └── cbb011d7c791813b7266de8c6140ac9d29f0db
@@ -617,7 +651,9 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   ├── 421e107a5db2fe053deccf9a0705588a3bffac
 │   │   │   ├── 4f58dad95efe8c5ecc35b796bf9c494910e61c
 │   │   │   ├── 8b35b4b90cc122ae26343880d901946bbe61e6
-│   │   │   └── 9af4eae13a65c5a0b889a9af5e98bc7f8d1d6e
+│   │   │   ├── 9af4eae13a65c5a0b889a9af5e98bc7f8d1d6e
+│   │   │   ├── acb9a4140642bb13096b4ef2538950425a5a98
+│   │   │   └── b61f4cb6dd1a457a6a2e3662006248e4b79679
 │   │   ├── c2
 │   │   │   └── bb8ad7ad1acbedf77aa4895fdf82e350834716
 │   │   ├── c3
@@ -649,6 +685,8 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   └── e488f73cf0d3dd2a12971d3ff51da29637eac4
 │   │   ├── d0
 │   │   │   └── 2aebb53eb90c3b80aa94d7b99111a3fe93045a
+│   │   ├── d1
+│   │   │   └── cc619a131c3c960541aa082aa111f38be67c10
 │   │   ├── d2
 │   │   │   └── 4956da32871b2e25d584bc5a100229a3efa633
 │   │   ├── d3
@@ -675,6 +713,8 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   ├── d8
 │   │   │   ├── 05d6fbcdbe9d051cd0343467ea35d2d84c4fb9
 │   │   │   └── 5e2404cda87efa466617a4e7028b319dd3b9e5
+│   │   ├── d9
+│   │   │   └── 31517f562ef3ea07e96a33df75260a29d5ebe8
 │   │   ├── db
 │   │   │   ├── 00854b03192fa2291ad85e7c866e5861eeed95
 │   │   │   └── ece25ea27d7816cd40d2f47d218e6ac6b3cc4c
@@ -731,20 +771,26 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   ├── ea
 │   │   │   ├── 089ab52619d4c53d7941cfe0056c7a0c5d997a
 │   │   │   ├── aec7975074b9d1136138dad17ec194e9bca9f3
+│   │   │   ├── e15cb1875293b96e929a302a0106ee9d3a65d8
 │   │   │   └── fa9e6affa4cd187fe0b9d6353060504043c1ac
 │   │   ├── eb
 │   │   │   ├── 0877f801ca3bc145f201ad9ebec74984a434da
 │   │   │   ├── a17a28d867c221278ba6ecd9b9e8a6b4f234f7
 │   │   │   └── fd168f66899ec2244c0cc20bf613e0fd7be5fb
 │   │   ├── ec
-│   │   │   └── 1dce986b1d9609a3cfb51ef627caa18125b66b
+│   │   │   ├── 06f019511d47fe6b30f8d14a7a58269b35d113
+│   │   │   ├── 1dce986b1d9609a3cfb51ef627caa18125b66b
+│   │   │   └── 757935d208eb64035bd84d6f03d924176e92bd
 │   │   ├── ed
 │   │   │   ├── c37884a73a2b6ddaa6d5988ef1790ed97791e0
 │   │   │   └── d088e5abe8e28b12decc58b6a664e104eee54e
 │   │   ├── ee
 │   │   │   └── bc741cadfbabb76ee2042248144fe9841f5436
+│   │   ├── ef
+│   │   │   └── 3c1ae1b8bf1345955b759fb76b6699dc48aff8
 │   │   ├── f0
-│   │   │   └── a13f4b4f03ad1264ea4a0fe6b7274bc311ee02
+│   │   │   ├── a13f4b4f03ad1264ea4a0fe6b7274bc311ee02
+│   │   │   └── f7dfacede4698df396fbabb7bfcf744a1582e9
 │   │   ├── f1
 │   │   │   ├── 2d5b67214236b8c005646edb3d71b0845df3ab
 │   │   │   ├── dbf88c2b982cfa61cf8b126349a9dbe435e4c1
@@ -752,6 +798,7 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   ├── f2
 │   │   │   └── 528ec8b72d14fdcf6688e51ee392a532526b49
 │   │   ├── f3
+│   │   │   ├── 68da6051f4cecb1c25f290cc00ead001ac1139
 │   │   │   ├── 71cb17075ba94fb39b7c54babfec231b1b63d9
 │   │   │   ├── d3a5592fede7d8458e8acdd9e4f56c1b5bc4f6
 │   │   │   └── def57e8f2998942254b33b3fda500f6efe17aa
@@ -761,8 +808,11 @@ Generated: 2025-11-14T14:43:41.993561
 │   │   │   └── c24ed0934cd7390b3e20da437c090b6cb7b174
 │   │   ├── f5
 │   │   │   └── 88ad9232bc0f27a4ceb8cb86595195da595d50
+│   │   ├── f6
+│   │   │   └── b7fdfec98e25f42e4fa35a9eb61879887d2f04
 │   │   ├── f7
 │   │   │   ├── 42020e16493d3603c910aaeb0dce2950545813
+│   │   │   ├── 4bda369f2c220ca6164242ef4a575cc7750998
 │   │   │   └── 83fddc9f10b2609e5b3cd3251d5852fe99c4a8
 │   │   ├── f8
 │   │   │   ├── 444b5c75ad339526140b7a9092ccdad538b455
@@ -852,9 +902,6 @@ Generated: 2025-11-14T14:43:41.993561
 │   ├── versioning.py
 │   ├── webhooks.py
 │   └── websocket.py
-├── audio
-│   └── wake_word.py
-├── commands_registry.py
 ├── constants
 │   ├── __init__.py
 │   ├── __pycache__
@@ -869,9 +916,6 @@ Generated: 2025-11-14T14:43:41.993561
 │   └── suggestions.py
 ├── core
 │   └── __init__.py
-├── dispatcher
-│   ├── __init__.py
-│   └── intent_router.py
 ├── events
 │   └── event_bus.py
 ├── integrations
@@ -890,7 +934,6 @@ Generated: 2025-11-14T14:43:41.993561
 │   ├── compliance_manager.py
 │   ├── email_client.py
 │   ├── enterprise_integrations.py
-│   ├── event_system.py
 │   ├── file_operations.py
 │   ├── firewall_manager.py
 │   ├── ms_graph_auth.py
@@ -910,22 +953,12 @@ Generated: 2025-11-14T14:43:41.993561
 ├── logging_conf
 │   ├── __init__.py
 │   └── logging_dashboard.py
-├── logging_config.py
 ├── main.py
-├── nlp
-│   ├── __init__.py
-│   ├── intent_executor.py
-│   └── intent_router.py
-├── nlu
-│   ├── __init__.py
-│   └── nlu_manager.py
 ├── permissions
-│   └── __init__.py
-├── rate_limit.py
+│   ├── __init__.py
+│   └── __pycache__
+│       └── __init__.cpython-312.pyc
 ├── requirements.txt
-├── run.py
-├── sebas_service.py
-├── service_client.py
 ├── services
 │   ├── __init__.py
 │   ├── __pycache__
@@ -947,8 +980,7 @@ Generated: 2025-11-14T14:43:41.993561
 │   ├── tts_manager.py
 │   ├── voice_engine_piper.py
 │   ├── voice_manager.py
-│   ├── voice_system.py
-│   └── wake_word.py
+│   └── voice_system.py
 ├── skills
 │   ├── __init__.py
 │   ├── ad_skill.py
@@ -979,7 +1011,6 @@ Generated: 2025-11-14T14:43:41.993561
 │   ├── stt_manager.py
 │   ├── stt_none.py
 │   └── stt_vosk.py
-├── test_storage_manager.py
 ├── tools
 │   ├── __init__.py
 │   ├── __pycache__
@@ -1016,6 +1047,7 @@ Generated: 2025-11-14T14:43:41.993561
 │   └── piper
 └── wakeword
     ├── __init__.py
+    ├── wakeword_detector.py
     ├── wakeword_dummy.py
     ├── wakeword_manager.py
     ├── wakeword_porcupine.py
