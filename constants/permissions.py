@@ -6,7 +6,7 @@ Compatible with intent-based permissions.
 
 import enum
 import logging
-from sebas.typing import Dict
+from typing import Dict
 
 
 # ---------------------------------------------------

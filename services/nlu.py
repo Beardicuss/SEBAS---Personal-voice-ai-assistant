@@ -1,6 +1,6 @@
 import re
-from sebas.dataclasses import dataclass
-from sebas.typing import Dict, Any, Optional, List, Tuple
+from dataclasses import dataclass
+from typing import Dict, Any, Optional, List, Tuple
 
 
 @dataclass

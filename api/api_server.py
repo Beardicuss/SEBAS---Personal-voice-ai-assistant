@@ -1,16 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-SEBAS REST API Server (Clean, EventBus Compatible)
+SEBAS REST API Server - Stage 1 Mk.I
 
 Provides:
     POST /api/v1/parse     → natural language command
     GET  /api/v1/health
     GET  /api/v1/version
-
-This version:
-    - Does NOT depend on full Sebas class
-    - Works with any dispatcher + NLU
-    - Is compatible with EventBus (calls via dispatcher)
 """
 
 import logging
@@ -32,7 +27,7 @@ class APIServer:
         port=5002
     ):
         self.sebas = sebas_instance
-        self.nlu = nlu or getattr(sebas_instance, "nlu", None)
+        self.nlu = nlu
 
         self.host = host
         self.port = port
@@ -41,6 +36,8 @@ class APIServer:
 
         self.app = Flask(__name__)
         self._register_routes()
+
+        logging.info(f"API Server initialized on {host}:{port}")
 
     # ---------------------------------------------------------
     # ROUTES
@@ -52,6 +49,7 @@ class APIServer:
             return jsonify({
                 "status": "online",
                 "service": "sebas-api",
+                "version": "1.0-stage1"
             })
 
         @self.app.route("/api/v1/health")
@@ -63,10 +61,14 @@ class APIServer:
 
         @self.app.route("/api/v1/version")
         def version():
+            skill_count = 0
+            if self.sebas and hasattr(self.sebas, 'skill_registry'):
+                skill_count = len(self.sebas.skill_registry.skills)
+            
             return jsonify({
-                "api_version": "1.0.0",
+                "api_version": "1.0.0-stage1",
                 "nlu": bool(self.nlu),
-                "skills": len(getattr(self.sebas.skill_registry, "skills", [])),
+                "skills_loaded": skill_count,
             })
 
         @self.app.route("/api/v1/parse", methods=["POST"])
@@ -85,7 +87,9 @@ class APIServer:
                 return jsonify({"error": "sebas_not_ready"}), 503
 
             # NLU first
-            intent, _ = self.nlu.get_intent_with_confidence(text) if self.nlu else (None, None)
+            intent = None
+            if self.nlu:
+                intent, _ = self.nlu.get_intent_with_confidence(text)
 
             # Dispatch through Sebas core
             try:
@@ -104,13 +108,16 @@ class APIServer:
     # START SERVER
     # ---------------------------------------------------------
     def start(self):
+        """Start API server in background thread."""
         if self.running:
+            logging.warning("API server already running")
             return
 
         self.running = True
 
         def _run():
             try:
+                logging.info(f"Starting API server on {self.host}:{self.port}")
                 self.app.run(
                     host=self.host,
                     port=self.port,
@@ -127,3 +134,15 @@ class APIServer:
             target=_run, daemon=True, name="SebasAPIServer"
         )
         self.server_thread.start()
+        logging.info("API server thread started")
+
+
+# Helper function for backward compatibility
+def create_api_server(sebas_instance=None, nlu=None, host="127.0.0.1", port=5002):
+    """Create and return an APIServer instance."""
+    return APIServer(
+        sebas_instance=sebas_instance,
+        nlu=nlu,
+        host=host,
+        port=port
+    )

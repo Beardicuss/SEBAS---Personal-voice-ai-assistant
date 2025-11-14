@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Skill Registry - Dynamically loads and manages SEBAS skills
+Skill Registry - Stage 1 Mk.I
+Dynamically loads and manages SEBAS skills
 """
 
 import os
 import importlib.util
 import inspect
-from sebas.typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional
 from sebas.skills.base_skill import BaseSkill
 import logging
 
@@ -14,7 +15,7 @@ import logging
 class SkillRegistry:
     """Manages the loading, registration, and execution of skills."""
 
-    def __init__(self, assistant_ref, skills_dir: str = "skills"):
+    def __init__(self, assistant_ref, skills_dir: str = None):
         """
         Initialize the skill registry.
 
@@ -22,56 +23,41 @@ class SkillRegistry:
             assistant_ref: Reference to the main assistant instance
             skills_dir: Directory where skills are located
         """
+
         self.assistant = assistant_ref
-        self.skills_dir = skills_dir
+
+        # FIX #1: Always load skills from sebas/skills no matter where run.py is executed
+        base_dir = os.path.dirname(os.path.abspath(__file__))   # sebas/services/
+        real_skills_dir = os.path.join(base_dir, "..", "skills")
+
+        self.skills_dir = os.path.abspath(real_skills_dir)
         self.skills: List[BaseSkill] = []
         self.logger = logging.getLogger(__name__)
-        self._load_skills()
 
-    def _load_skills(self):
+        self._load_all_skills()
+
+    def _load_all_skills(self):
         """Load all skills from the skills directory."""
+
         if not os.path.exists(self.skills_dir):
-            self.logger.warning(f"Skills directory '{self.skills_dir}' does not exist")
+            self.logger.error(f"Skills directory not found at: {self.skills_dir}")
             return
 
-        builtin_skills = [
-            'skills.system_skill',
-            'skills.app_skill',
-            'skills.file_skill',
-            'skills.smart_home_skill',
-            'skills.code_skill',
-            'skills.monitoring_skill',
-            # Phase 2 skills
-            'skills.ad_skill',
-            'skills.service_skill',
-            'skills.network_skill',
-            # Phase 3 skills
-            'skills.storage_skill',
-            # Phase 4 skills
-            'skills.security_skill',
-            'skills.compliance_skill',
-            # Phase 5 skills
-            'skills.automation_skill',
-            # Phase 6 skills
-            'skills.ai_analytics_skill',
-            'skills.nlu_skill'
+        # Stage 1: load essential skills
+        stage1_skills = [
+            'sebas.skills.system_skill',
+            'sebas.skills.app_skill',
+            'sebas.skills.file_skill',
+            'sebas.skills.network_skill',
         ]
 
-        for module_name in builtin_skills:
+        for module_name in stage1_skills:
             try:
                 self._load_skill_module(module_name)
             except Exception as e:
                 self.logger.error(f"Failed to load skill {module_name}: {e}")
 
-        # Load any extra files from the folder
-        for filename in os.listdir(self.skills_dir):
-            if filename.endswith('_skill.py') and filename != 'base_skill.py':
-                module_name = f"skills.{filename[:-3]}"
-                if module_name not in builtin_skills:
-                    try:
-                        self._load_skill_module(module_name)
-                    except Exception as e:
-                        self.logger.error(f"Failed to load skill {module_name}: {e}")
+        self.logger.info(f"Loaded {len(self.skills)} skills for Stage 1")
 
     def _load_skill_module(self, module_name: str):
         """Load a skill module and instantiate its class."""
@@ -81,7 +67,7 @@ class SkillRegistry:
                 raise ImportError(f"Failed to load module spec for {module_name}")
 
             module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)  # type: ignore[union-attr]
+            spec.loader.exec_module(module)
 
             skill_class = None
             for name, obj in inspect.getmembers(module):
@@ -94,10 +80,10 @@ class SkillRegistry:
 
             skill_instance = skill_class(self.assistant)
             self.skills.append(skill_instance)
-            self.logger.info(f"Loaded skill: {skill_class.__name__}")
+            self.logger.info(f"✓ Loaded skill: {skill_class.__name__}")
 
         except Exception as e:
-            self.logger.error(f"Error loading skill {module_name}: {e}")
+            self.logger.error(f"✗ Error loading skill {module_name}: {e}")
             raise
 
     def get_skill_for_intent(self, intent: str) -> Optional[BaseSkill]:
@@ -113,7 +99,7 @@ class SkillRegistry:
         if skill:
             try:
                 return skill.handle(intent, slots)
-            except Exception as e:
+            except Exception:
                 self.logger.exception(f"Error in skill {skill.__class__.__name__} handling {intent}")
                 return False
         return False
@@ -135,19 +121,7 @@ class SkillRegistry:
         for skill in self.skills:
             if skill.__class__.__name__ == skill_name:
                 skill.set_enabled(enabled)
-                if hasattr(self.assistant, 'prefs'):
-                    pref_key = f"skill_{skill_name.lower()}_enabled"
-                    self.assistant.prefs.set_pref(pref_key, enabled)
                 break
-
-    def load_skill_preferences(self):
-        """Load skill enable/disable preferences."""
-        if not hasattr(self.assistant, 'prefs'):
-            return
-        for skill in self.skills:
-            pref_key = f"skill_{skill.__class__.__name__.lower()}_enabled"
-            enabled = self.assistant.prefs.get_pref(pref_key, True)
-            skill.set_enabled(enabled)
 
     def get_skill_info(self) -> Dict[str, Any]:
         """Return info about all loaded skills."""

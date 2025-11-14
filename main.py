@@ -1,30 +1,33 @@
 """
-SEBAS CORE MAIN CONTROLLER – EventBus Integrated
-Clean, modular, scalable architecture for assistant.
+SEBAS CORE MAIN CONTROLLER – Stage 1 Mk.I
+Clean, modular, stable architecture for voice assistant.
 """
 
 import logging
 import time
 
 # === Core Services ===
-from sebas.permissions.permission_manager import PermissionManager
-from sebas.services.language_manager import LanguageManager
-from sebas.services.skill_registry import SkillRegistry
-from sebas.services.nlu import SimpleNLU, ContextManager
+from .permissions.permission_manager import PermissionManager
+from .services.language_manager import LanguageManager
+from .services.skill_registry import SkillRegistry
+from .services.nlu import SimpleNLU, ContextManager
 
 # === Audio Modules ===
-from sebas.stt.stt_manager import STTManager
-from sebas.tts.tts_manager import TTSManager
+from .stt.stt_manager import STTManager
+from .tts.tts_manager import TTSManager
 
 # === Wake Word Module ===
-from sebas.wakeword.wakeword_detector import WakeWordDetector
+from .wakeword.wakeword_detector import WakeWordDetector
 
 # === UI & API ===
-from sebas.api.ui_server import start_ui_server
-from sebas.api.api_server import create_api_server
+from .api.ui_server import start_ui_server
+from .api.api_server import APIServer
 
 # === Events ===
-from sebas.events.event_bus import EventBus
+from .events.event_bus import EventBus
+
+# === Permissions ===
+from .constants.permissions import Role, is_authorized
 
 
 # ============================================================
@@ -39,7 +42,7 @@ class Sebas:
     """
 
     def __init__(self):
-        logging.info("Initializing Sebas assistant...")
+        logging.info("Initializing Sebas assistant (Stage 1 Mk.I)...")
 
         # --------------------------------------------------
         # Global Event Bus
@@ -55,7 +58,7 @@ class Sebas:
         # Permissions / Roles
         # --------------------------------------------------
         self.permission_manager = PermissionManager()
-        self.user_role = "owner"  # full access
+        self.user_role = Role.ADMIN_OWNER  # Full access for owner
 
         # --------------------------------------------------
         # NLU + Context Memory
@@ -74,17 +77,19 @@ class Sebas:
         self.language_manager.bind_tts(self.tts)
 
         # --------------------------------------------------
-        # Skill System — Auto Loader Mk.III + EventBus
+        # Skill System — Auto Loader
         # --------------------------------------------------
-        self.skill_registry = SkillRegistry(event_bus=self.events)
-        self.skill_registry.load_skills()
+        self.skill_registry = SkillRegistry(
+            assistant_ref=self,
+            skills_dir="skills"
+        )
 
         # --------------------------------------------------
         # Wake Word Detector
         # --------------------------------------------------
         self.wakeword = WakeWordDetector(callback=self._on_wake_word)
 
-        logging.info("Sebas fully initialized.")
+        logging.info("Sebas fully initialized (Stage 1).")
 
         # Emit startup event
         self.events.emit("core.started")
@@ -117,7 +122,7 @@ class Sebas:
     # ========================================================
     #             Wake Word Callback
     # ========================================================
-    def _on_wake_word(self, text=None):
+    def _on_wake_word(self, data=None):
         """Triggered when wake word is detected."""
         self.events.emit("core.wake_word_detected")
         self.speak("Yes, sir?")
@@ -175,13 +180,13 @@ class Sebas:
         )
 
         # -------- Permission Check --------
-        if not self.permission_manager.has_permission(self.user_role, intent.name):
+        if not is_authorized(self.user_role, intent.name):
             self.events.emit("core.permission_denied", intent)
             self.speak("You do not have permission for this action.")
             return
 
         # -------- Dispatch to Skills --------
-        handled = self.skill_registry.handle_intent(intent.name, intent.slots, self)
+        handled = self.skill_registry.handle_intent(intent.name, intent.slots)
 
         if handled:
             self.events.emit("core.intent_handled", intent)
@@ -203,16 +208,20 @@ class Sebas:
 # ============================================================
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+    )
 
     assistant = Sebas()
 
     # Start UI server
-    start_ui_server()
+    start_ui_server(host="127.0.0.1", port=5000)
 
     # Start API server
-    api = create_api_server(
+    api = APIServer(
         sebas_instance=assistant,
+        nlu=assistant.nlu,
         host="127.0.0.1",
         port=5002
     )
@@ -221,6 +230,11 @@ if __name__ == "__main__":
     # Start Sebas core
     assistant.start()
 
+    logging.info("SEBAS Stage 1 running. Press Ctrl+C to exit.")
+
     # Keep process alive
-    while True:
-        time.sleep(1)
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logging.info("Shutting down SEBAS...")

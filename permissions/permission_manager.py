@@ -1,4 +1,4 @@
-from sebas.permissions.role_map import Role, INTENT_PERMISSIONS
+from ..constants.permissions import Role, _INTENT_PERMISSIONS as INTENT_PERMISSIONS
 
 
 class PermissionManager:

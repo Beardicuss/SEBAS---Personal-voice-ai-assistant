@@ -1,11 +1,13 @@
 =============================================
          SEBAS PROJECT STRUCTURE Mk.I
 =============================================
-Generated: 2025-11-14T15:34:05.732956
+Generated: 2025-11-14T19:57:14.067033
 
 ├── .git
 │   ├── COMMIT_EDITMSG
+│   ├── FETCH_HEAD
 │   ├── HEAD
+│   ├── ORIG_HEAD
 │   ├── config
 │   ├── description
 │   ├── hooks
@@ -37,7 +39,8 @@ Generated: 2025-11-14T15:34:05.732956
 │   │               └── main
 │   ├── objects
 │   │   ├── 00
-│   │   │   └── 06f3e9680733ec079991ad3c8c20aa4ad984b4
+│   │   │   ├── 06f3e9680733ec079991ad3c8c20aa4ad984b4
+│   │   │   └── 56dae70ac31239a60ae0f211558e7c18ce486d
 │   │   ├── 01
 │   │   │   ├── 34189e6c3172a31968c739bc54881d596a22f8
 │   │   │   ├── 3459e4512c45fbd2da889ff7664990ab4de60e
@@ -203,6 +206,7 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── 31
 │   │   │   └── f584c6ae6fba1f19d80b9c4220f701f2f8c8ff
 │   │   ├── 32
+│   │   │   ├── 1c65ed854eb656b131903f6b7d89d875c1c998
 │   │   │   ├── 8a5c3f16ecb3de8eb738fad8ad62aebfadb4c0
 │   │   │   └── a76c15e933c21808b05e34831786ef891efc75
 │   │   ├── 33
@@ -219,6 +223,7 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   │   ├── 293b2f00057a60c5472c418a1af588f532ce20
 │   │   │   └── d8116e4d8c1a7d1914f40fca4ef15ac4462fe1
 │   │   ├── 39
+│   │   │   ├── 80dce872b9452df45bdea73a6c3d09f21c1350
 │   │   │   └── 961132eba8bd275b3c606228901f7607659068
 │   │   ├── 3a
 │   │   │   ├── 2550737d43a61e558c628097aef018dafbfebf
@@ -242,6 +247,7 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── 40
 │   │   │   └── 70198a2155e3cfefbc303dd4bd45b3a50323b8
 │   │   ├── 41
+│   │   │   ├── 6eba724011c564da709ec186255e2c67670141
 │   │   │   └── d5f9ef66d84c66451b38df40aeae8bb5c96e27
 │   │   ├── 42
 │   │   │   ├── 88d84a0ac521ab09c99f3a8aeda13c439f6018
@@ -339,7 +345,8 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   │   └── d51d454bfb87cc2ab5982a938235e40731fe19
 │   │   ├── 5f
 │   │   │   ├── 22f8b5f3093370ba49f93e1c5cc2b1dfc68231
-│   │   │   └── 742bdcd360a9c1a426ff228ee65ce38fc734ff
+│   │   │   ├── 742bdcd360a9c1a426ff228ee65ce38fc734ff
+│   │   │   └── 78edd727ff74b582acd27bba64a2366c884ba5
 │   │   ├── 60
 │   │   │   ├── 1e75b42f17ceb563c475967e23060571c7bab4
 │   │   │   ├── 7013a11708dba5cd75c6154a3dffbf3be09833
@@ -348,6 +355,7 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── 61
 │   │   │   ├── 1c98e392aac01f79c1576604add99db1f4b9d2
 │   │   │   ├── 3c788badd26ebe7f60c0284db1fc257e99f7e5
+│   │   │   ├── c02b947beeed620310c023361a949f1fbf9263
 │   │   │   └── cc1131604140683dce46faac0b017f50be9d80
 │   │   ├── 62
 │   │   │   └── f2b8a437930cd7c8af06111ef97d21cdb8aa50
@@ -361,6 +369,7 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── 68
 │   │   │   ├── 08a15817b326ce3bf5b89721a44fc25f8ed3d6
 │   │   │   ├── 28747568bc0a66107593e14217e8092c5b9f6b
+│   │   │   ├── 7088abaff8c49c9a7a2858acc4ba1dee3d6f44
 │   │   │   ├── 914bc79fa19228757318f47689e540712b010e
 │   │   │   ├── e4e8573f98c1bc5dcb9910d6e052342aaaf00e
 │   │   │   └── ff86d9afa34625dfaf5f66bd3fda2c21cc8877
@@ -383,15 +392,18 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── 6f
 │   │   │   ├── 42ad88bbb8e6fff9cac439b37af694c53068d4
 │   │   │   ├── 965c77ac45f739f18ca908fdab6f8028c31ccc
-│   │   │   └── c09f7f331a0e29fe081b0917b1b9fdb286dbab
+│   │   │   ├── c09f7f331a0e29fe081b0917b1b9fdb286dbab
+│   │   │   └── ff1099ff9c25efa2a20f4dd2546c9e35fe1563
 │   │   ├── 70
 │   │   │   ├── 082c4ccef88db1842a9f5eaedd52d6a32d9004
 │   │   │   ├── 2e4755cdc3095618ea2cf3def2975f559be83d
 │   │   │   └── 644af37059be634ea50c424c6dd069ef08640a
 │   │   ├── 71
 │   │   │   ├── 44b7cd42a5a23eb3456e775cdc2b9a7939ce97
-│   │   │   └── 7a20f903826c4e0ca5d50a37ee1c4168e8ce49
+│   │   │   ├── 7a20f903826c4e0ca5d50a37ee1c4168e8ce49
+│   │   │   └── f308449678b3f48e56ec6c39a84da7c20d8790
 │   │   ├── 72
+│   │   │   ├── 71334cc1d46e3f80f5504f5ee469f4df6d0845
 │   │   │   └── 7873c921e11437be1ea59cf170a412c053f2a9
 │   │   ├── 73
 │   │   │   ├── 24ce8d6bac304620d5e9c08f823f09ff0b1914
@@ -417,6 +429,7 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── 79
 │   │   │   └── 762f4c9d66fbbbfb3de6fba971ba10f9b2b6a8
 │   │   ├── 7a
+│   │   │   ├── 207043e18f8d4ac5e9e19d848f7b5fc56b7300
 │   │   │   ├── 40b09720262226667d92c39046dd386ab26a23
 │   │   │   ├── ba8eb1f50822f3d3c3675b1a4f272eae7d3d27
 │   │   │   └── de5a06ac5f2b1a05eb1b0ddb6fd0ceecaa7c86
@@ -459,6 +472,7 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   │   └── cf47ceea74dba792a5454d853f58bc63ee6e04
 │   │   ├── 87
 │   │   │   ├── 56778ccf295d200be88e3fd2803f4eeb0301f8
+│   │   │   ├── 6d095ffe0fdbb01a892405d12caf9431470bc9
 │   │   │   └── cefc3e209bcead4420386a34ee53cbd869c874
 │   │   ├── 88
 │   │   │   ├── 92ce78b5d43e6cfe5c31fdc58a9316e51d1b68
@@ -508,7 +522,8 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   │   └── 966b6cc8a37ecfb85592d22bee66c67e735d59
 │   │   ├── 95
 │   │   │   ├── 25c54ec3f79298cae4a1fadde266feeb4ee95e
-│   │   │   └── 5fdb4109083bb4d967d57879168945e16eb462
+│   │   │   ├── 5fdb4109083bb4d967d57879168945e16eb462
+│   │   │   └── a673f422cc29a4dfc71be8060376127c72fdaa
 │   │   ├── 97
 │   │   │   ├── 1b7c5aabffd0053a58f124f8941aa65c1d6a93
 │   │   │   ├── 9cec056c8f927e15deaaae6347f267f20e2f76
@@ -530,6 +545,8 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   │   ├── 648fddc8405b2a188893c4619a8efa52101f6f
 │   │   │   ├── 8518c6dc36f604f780f4dcb06236c2d9de1f46
 │   │   │   └── b0234a73a8bb3873abdcda1a824384855ae28d
+│   │   ├── 9c
+│   │   │   └── 9bccc81ea4ada4056e48bc70fed61fa85f7dd6
 │   │   ├── 9d
 │   │   │   ├── 2eb773b7147d1243589411398cc74afd3acd6c
 │   │   │   ├── 302637f57ec8f636e1a9b75eb8864bbac5a75a
@@ -538,11 +555,13 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   │   ├── 9714c6fbc3985351545a099e9c885546dacab4
 │   │   │   └── 97faca00d971533789489a938d3e692b57f688
 │   │   ├── 9e
+│   │   │   ├── 02998684f86d3da6207a22eddb1ffd36cde810
 │   │   │   ├── aad8a2f1bb27fd775137c2d42a00eb7b190aa6
 │   │   │   └── cc70955c26bbf6d5152b595961a5a19ea5c873
 │   │   ├── 9f
 │   │   │   ├── 4a2061d15dec754252ef9d617b17a191470981
 │   │   │   ├── 548cf55179b8ea036e254a8211b8986c93bf73
+│   │   │   ├── 679400bbfffbc8e4bf0a01138fe07196796ebe
 │   │   │   ├── 90958fe078827046d563a228d32991d4eca751
 │   │   │   ├── ca45d8af817d1dcb62e6e129f900df3067e4c5
 │   │   │   └── fc1ec2ceb8128472d81db77da00b99403af23c
@@ -563,10 +582,12 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── a5
 │   │   │   └── 72cd22e77144a5f765faac85a375dee9c80b13
 │   │   ├── a6
+│   │   │   ├── 3e350ae713390aa62112cf51d4680dd23b7d9e
 │   │   │   ├── 6ea35c8375fdb5327323429b3788409d1a259f
 │   │   │   └── 95dfe591260375391527033cde601d57811a80
 │   │   ├── a8
-│   │   │   └── 6dd416d2ebe6891d594f84f480be9bf2bd8519
+│   │   │   ├── 6dd416d2ebe6891d594f84f480be9bf2bd8519
+│   │   │   └── 91abae14f7771e6d309675ed99267d570ecd6f
 │   │   ├── a9
 │   │   │   ├── 17002ffbdf882f8169b744ced598c43a95a3ef
 │   │   │   ├── 4aa5f1f4e45ae4d0508facb941cf25d0d7076a
@@ -686,6 +707,7 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── d0
 │   │   │   └── 2aebb53eb90c3b80aa94d7b99111a3fe93045a
 │   │   ├── d1
+│   │   │   ├── 2d40fea77580cb28cd154f4cbfb3adffcc8283
 │   │   │   └── cc619a131c3c960541aa082aa111f38be67c10
 │   │   ├── d2
 │   │   │   └── 4956da32871b2e25d584bc5a100229a3efa633
@@ -709,12 +731,16 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   │   └── 0ffb62d87ea99bf85c9abe0381090feb4d5f32
 │   │   ├── d7
 │   │   │   ├── 224161f101802e381af4142d0e1188624089d7
-│   │   │   └── 6d414397a3a8df0f2031ce1fecb8bcaa0d56c8
+│   │   │   ├── 6d414397a3a8df0f2031ce1fecb8bcaa0d56c8
+│   │   │   └── df2747037a9a5a65e5e28a0ae2bbf7984089a2
 │   │   ├── d8
 │   │   │   ├── 05d6fbcdbe9d051cd0343467ea35d2d84c4fb9
 │   │   │   └── 5e2404cda87efa466617a4e7028b319dd3b9e5
 │   │   ├── d9
-│   │   │   └── 31517f562ef3ea07e96a33df75260a29d5ebe8
+│   │   │   ├── 31517f562ef3ea07e96a33df75260a29d5ebe8
+│   │   │   └── f5f1f73487fddf977d9ad382922ea51cc12ef4
+│   │   ├── da
+│   │   │   └── b385d45354ed00687f5005ab9fc0948f2d64b9
 │   │   ├── db
 │   │   │   ├── 00854b03192fa2291ad85e7c866e5861eeed95
 │   │   │   └── ece25ea27d7816cd40d2f47d218e6ac6b3cc4c
@@ -730,6 +756,7 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   │   └── fe6f0d361d92088515858f9d2291ab06a7ca48
 │   │   ├── df
 │   │   │   ├── 909927ed3e360effe26922d1d07b9e04a9718a
+│   │   │   ├── e67cae4613e4ba36a2a041a8c35b1f95d1b345
 │   │   │   └── fa3824061c64e8c1fa779cc78f42be64775150
 │   │   ├── e0
 │   │   │   ├── 7918f30768c10e701f2d5e3aaf15042e0e244d
@@ -771,6 +798,7 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── ea
 │   │   │   ├── 089ab52619d4c53d7941cfe0056c7a0c5d997a
 │   │   │   ├── aec7975074b9d1136138dad17ec194e9bca9f3
+│   │   │   ├── dc14bd6c3896a26c3533a02613412e8287954f
 │   │   │   ├── e15cb1875293b96e929a302a0106ee9d3a65d8
 │   │   │   └── fa9e6affa4cd187fe0b9d6353060504043c1ac
 │   │   ├── eb
@@ -780,7 +808,8 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── ec
 │   │   │   ├── 06f019511d47fe6b30f8d14a7a58269b35d113
 │   │   │   ├── 1dce986b1d9609a3cfb51ef627caa18125b66b
-│   │   │   └── 757935d208eb64035bd84d6f03d924176e92bd
+│   │   │   ├── 757935d208eb64035bd84d6f03d924176e92bd
+│   │   │   └── b0fffae26c0bdd84e29805c296a132dce554cb
 │   │   ├── ed
 │   │   │   ├── c37884a73a2b6ddaa6d5988ef1790ed97791e0
 │   │   │   └── d088e5abe8e28b12decc58b6a664e104eee54e
@@ -800,11 +829,13 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── f3
 │   │   │   ├── 68da6051f4cecb1c25f290cc00ead001ac1139
 │   │   │   ├── 71cb17075ba94fb39b7c54babfec231b1b63d9
+│   │   │   ├── d345a928b35e2e242dffa26ff70e8d08d5ee41
 │   │   │   ├── d3a5592fede7d8458e8acdd9e4f56c1b5bc4f6
 │   │   │   └── def57e8f2998942254b33b3fda500f6efe17aa
 │   │   ├── f4
 │   │   │   ├── 05a8cdb71c3f3d04a5ce9707d8130b860b7ba1
 │   │   │   ├── 348972c71fd20b503dab233bedb0ef48ba7044
+│   │   │   ├── 54de8640fdeae48bfc6f4d0ffb124ec6503e49
 │   │   │   └── c24ed0934cd7390b3e20da437c090b6cb7b174
 │   │   ├── f5
 │   │   │   └── 88ad9232bc0f27a4ceb8cb86595195da595d50
@@ -817,6 +848,7 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── f8
 │   │   │   ├── 444b5c75ad339526140b7a9092ccdad538b455
 │   │   │   ├── 69c97da2474ab792f70c5c65020f280c8dea5d
+│   │   │   ├── 9fd66a4d4389c508ee2dd5a7c9ad658d889607
 │   │   │   ├── db8e3431d7d59327c3d3b8a74df785ccc3ac35
 │   │   │   ├── dcb7ff1297c0b35d1b51d339cac0ad40f1ec46
 │   │   │   └── f3db722faf8687c9889ef79b5adaccf3bf209d
@@ -825,6 +857,7 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── fa
 │   │   │   ├── 03542b688bfd6dfccd53f17488bc6810d1ecd5
 │   │   │   ├── 263db251f0ff26ba68a1c019db103bfc10a90e
+│   │   │   ├── 5d200b8a59caf0f925b78960a12a9a37ac7f7b
 │   │   │   └── 7f0e6c622256d63a243269dce0a55736747047
 │   │   ├── fb
 │   │   │   ├── 45a32e1a03ec5abb7bde89b32dc0dc358c8252
@@ -832,6 +865,7 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   │   ├── ac0bf201bca8653add2a8c17383736794bdf45
 │   │   │   └── bc2793bd14ab30f0d7dea2be7d25ecd5789cf7
 │   │   ├── fc
+│   │   │   ├── 23d61cb6a18a574f43860115bb7d2215838f5e
 │   │   │   ├── 585a3fb00ff962e7453562c26ed87b4e28dfd4
 │   │   │   └── c553ace3ba1375f6cdea892a159f4c103f3a2a
 │   │   ├── fd
@@ -917,6 +951,8 @@ Generated: 2025-11-14T15:34:05.732956
 ├── core
 │   └── __init__.py
 ├── events
+│   ├── __pycache__
+│   │   └── event_bus.cpython-312.pyc
 │   └── event_bus.py
 ├── integrations
 │   ├── __init__.py
@@ -956,8 +992,10 @@ Generated: 2025-11-14T15:34:05.732956
 ├── main.py
 ├── permissions
 │   ├── __init__.py
-│   └── __pycache__
-│       └── __init__.cpython-312.pyc
+│   ├── __pycache__
+│   │   ├── __init__.cpython-312.pyc
+│   │   └── permission_manager.cpython-312.pyc
+│   └── permission_manager.py
 ├── requirements.txt
 ├── services
 │   ├── __init__.py
@@ -970,19 +1008,23 @@ Generated: 2025-11-14T15:34:05.732956
 │   │   ├── voice_engine_piper.cpython-312.pyc
 │   │   ├── voice_manager.cpython-312.pyc
 │   │   └── voice_system.cpython-312.pyc
-│   ├── context_manager.py
-│   ├── intent_executor.py
 │   ├── language_manager.py
+│   ├── legacy
+│   │   ├── voice_engine_piper.py
+│   │   ├── voice_manager.py
+│   │   └── voice_system.py
 │   ├── nlu.py
 │   ├── skill_registry.py
-│   ├── stt_manager.py
-│   ├── task_manager.py
-│   ├── tts_manager.py
-│   ├── voice_engine_piper.py
-│   ├── voice_manager.py
-│   └── voice_system.py
+│   └── task_manager.py
 ├── skills
 │   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-312.pyc
+│   │   ├── app_skill.cpython-312.pyc
+│   │   ├── base_skill.cpython-312.pyc
+│   │   ├── file_skill.cpython-312.pyc
+│   │   ├── network_skill.cpython-312.pyc
+│   │   └── system_skill.cpython-312.pyc
 │   ├── ad_skill.py
 │   ├── ai_analytics_skill.py
 │   ├── app_skill.py
@@ -997,10 +1039,8 @@ Generated: 2025-11-14T15:34:05.732956
 │   ├── monitoring_skill.py
 │   ├── network_skill.py
 │   ├── nlu_skill.py
-│   ├── open_app_skill.py
 │   ├── security_skill.py
 │   ├── service_skill.py
-│   ├── skill_registry.py
 │   ├── smart_home_skill.py
 │   ├── storage_skill.py
 │   ├── system
@@ -1008,6 +1048,11 @@ Generated: 2025-11-14T15:34:05.732956
 │   └── volume_skill.py
 ├── stt
 │   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-312.pyc
+│   │   ├── stt_manager.cpython-312.pyc
+│   │   ├── stt_none.cpython-312.pyc
+│   │   └── stt_vosk.cpython-312.pyc
 │   ├── stt_manager.py
 │   ├── stt_none.py
 │   └── stt_vosk.py
@@ -1026,6 +1071,12 @@ Generated: 2025-11-14T15:34:05.732956
 │   └── structure_dump.py
 ├── tts
 │   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-312.pyc
+│   │   ├── tts_manager.cpython-312.pyc
+│   │   ├── tts_piper.cpython-312.pyc
+│   │   ├── tts_selector.cpython-312.pyc
+│   │   └── tts_system.cpython-312.pyc
 │   ├── tts_manager.py
 │   ├── tts_piper.py
 │   ├── tts_selector.py
@@ -1047,6 +1098,9 @@ Generated: 2025-11-14T15:34:05.732956
 │   └── piper
 └── wakeword
     ├── __init__.py
+    ├── __pycache__
+    │   ├── __init__.cpython-312.pyc
+    │   └── wakeword_detector.cpython-312.pyc
     ├── wakeword_detector.py
     ├── wakeword_dummy.py
     ├── wakeword_manager.py
