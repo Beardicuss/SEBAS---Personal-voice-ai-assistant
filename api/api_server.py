@@ -1,208 +1,129 @@
 # -*- coding: utf-8 -*-
 """
-SEBAS API Server (clean modular version)
-Does NOT depend on main.py or Sebas class directly.
-Can work with any dispatcher + NLU object.
+SEBAS REST API Server (Clean, EventBus Compatible)
+
+Provides:
+    POST /api/v1/parse     → natural language command
+    GET  /api/v1/health
+    GET  /api/v1/version
+
+This version:
+    - Does NOT depend on full Sebas class
+    - Works with any dispatcher + NLU
+    - Is compatible with EventBus (calls via dispatcher)
 """
 
 import logging
 import threading
-from sebas.datetime import datetime
-from sebas.typing import Optional
-
-import subprocess
-from sebas.flask import Flask, jsonify, request
-
-# Optional CORS support
-try:
-    from sebas.flask_cors import CORS
-    CORS_AVAILABLE = True
-except ImportError:
-    CORS_AVAILABLE = False
-
-# API infrastructure
-from sebas.api.auth import init_auth_manager
-from sebas.api.rate_limit import init_rate_limiter
-from sebas.api.webhooks import init_webhook_manager
-from sebas.api.versioning import get_api_version
-from sebas.api.websocket import init_websocket_manager, get_websocket_manager
+from flask import Flask, jsonify, request
+from typing import Optional
 
 
 class APIServer:
     """
-    Clean API Server.
-    Works with injected "nlu" and "dispatcher".
-    Does NOT launch wake-word, does NOT own Sebas.
+    Modular REST API for SEBAS.
     """
 
     def __init__(
         self,
-        dispatcher=None,
+        sebas_instance=None,
         nlu=None,
-        host: str = "127.0.0.1",
-        port: int = 5002
+        host="127.0.0.1",
+        port=5002
     ):
+        self.sebas = sebas_instance
+        self.nlu = nlu or getattr(sebas_instance, "nlu", None)
+
         self.host = host
         self.port = port
-        self.dispatcher = dispatcher
-        self.nlu = nlu
+        self.running = False
+        self.server_thread: Optional[threading.Thread] = None
 
         self.app = Flask(__name__)
-
-        if CORS_AVAILABLE:
-            CORS(self.app)
-
-        # initialize API submodules
-        init_auth_manager()
-        init_rate_limiter(default_rate=100, default_window=60)
-        init_webhook_manager()
-        init_websocket_manager(flask_app=self.app)
-
         self._register_routes()
-        self.server_thread: Optional[threading.Thread] = None
-        self.running = False
 
-    # --------------------------------------------------
+    # ---------------------------------------------------------
     # ROUTES
-    # --------------------------------------------------
+    # ---------------------------------------------------------
     def _register_routes(self):
 
-        @self.app.route("/", methods=["GET"])
-        def root_index():
+        @self.app.route("/")
+        def root():
             return jsonify({
                 "status": "online",
                 "service": "sebas-api",
-                "message": "Use /api/v1/parse to send commands."
             })
 
-        @self.app.route("/api/v1/health", methods=["GET"])
+        @self.app.route("/api/v1/health")
         def health():
             return jsonify({
                 "status": "ok",
                 "service": "sebas-api",
-                "version": get_api_version(),
-                "timestamp": datetime.utcnow().isoformat() + "Z",
             })
 
-        @self.app.route("/api/v1/version", methods=["GET"])
+        @self.app.route("/api/v1/version")
         def version():
             return jsonify({
-                "api_version": get_api_version(),
-                "webhooks": True,
-                "websocket": True,
+                "api_version": "1.0.0",
+                "nlu": bool(self.nlu),
+                "skills": len(getattr(self.sebas.skill_registry, "skills", [])),
             })
-
-        @self.app.errorhandler(404)
-        def not_found(error):
-            return jsonify({
-                "error": "Not found",
-                "message": "The requested endpoint does not exist"
-            }), 404
 
         @self.app.route("/api/v1/parse", methods=["POST"])
         def parse_command():
             """
-            Entry point: parse natural language command.
+            Public entry point for external clients.
             """
+
+            data = request.get_json() or {}
+            text = str(data.get("text", "")).strip()
+
+            if not text:
+                return jsonify({"error": "empty_command"}), 400
+
+            if not self.sebas:
+                return jsonify({"error": "sebas_not_ready"}), 503
+
+            # NLU first
+            intent, _ = self.nlu.get_intent_with_confidence(text) if self.nlu else (None, None)
+
+            # Dispatch through Sebas core
             try:
-                data = request.get_json(silent=True) or {}
-                text = str(data.get("text", "")).strip()
-
-                if not text:
-                    return jsonify({"error": "Empty command"}), 400
-
-                # Step 1. NLU
-                intent = None
-                if self.nlu:
-                    intent = self.nlu.parse(text)
-
-                if intent:
-                    intent_name = intent.name
-                    slots = intent.slots
-                    confidence = getattr(intent, "confidence", 1.0)
-                else:
-                    intent_name = None
-                    slots = {}
-                    confidence = 0.0
-
-                # Step 2. Dispatcher (if provided)
-                if self.dispatcher:
-                    try:
-                        result = self.dispatcher.handle(text, intent, slots)
-                        return jsonify({
-                            "result": result,
-                            "intent": intent_name,
-                            "slots": slots,
-                            "confidence": confidence
-                        })
-                    except Exception as e:
-                        logging.exception("Dispatcher error")
-                        return jsonify({
-                            "error": str(e),
-                            "intent": intent_name,
-                            "slots": slots
-                        }), 500
-
-                # Step 3. Fallback simple actions
-                if "notepad" in text.lower():
-                    subprocess.Popen("notepad.exe")
-                    return jsonify({"response": "Opened Notepad"})
-
-                if "calculator" in text.lower():
-                    subprocess.Popen("calc.exe")
-                    return jsonify({"response": "Opened Calculator"})
-
+                self.sebas.parse_and_execute(text)
                 return jsonify({
-                    "response": "No dispatcher and no fallback action.",
-                    "intent": intent_name,
-                    "slots": slots,
-                    "confidence": confidence,
+                    "ok": True,
+                    "intent": getattr(intent, "name", None),
+                    "slots": getattr(intent, "slots", {}),
+                    "confidence": getattr(intent, "confidence", None),
                 })
+            except Exception as ex:
+                logging.exception("Dispatcher error")
+                return jsonify({"ok": False, "error": str(ex)}), 500
 
-            except Exception as e:
-                logging.exception("Error in /api/v1/parse")
-                return jsonify({"error": str(e)}), 500
-
-    # --------------------------------------------------
+    # ---------------------------------------------------------
     # START SERVER
-    # --------------------------------------------------
+    # ---------------------------------------------------------
     def start(self):
         if self.running:
-            logging.warning("API server already running")
             return
 
         self.running = True
 
         def _run():
             try:
-                ws_mgr = get_websocket_manager()
-                socketio_instance = getattr(ws_mgr, "socketio", None)
-
-                if socketio_instance:
-                    socketio_instance.run(
-                        self.app,
-                        host=self.host,
-                        port=self.port,
-                        debug=False,
-                        use_reloader=False
-                    )
-                else:
-                    self.app.run(
-                        host=self.host,
-                        port=self.port,
-                        debug=False,
-                        use_reloader=False,
-                        threaded=True
-                    )
-
+                self.app.run(
+                    host=self.host,
+                    port=self.port,
+                    debug=False,
+                    use_reloader=False,
+                    threaded=True,
+                )
             except Exception as e:
                 logging.exception(f"API server error: {e}")
             finally:
                 self.running = False
 
         self.server_thread = threading.Thread(
-            target=_run,
-            daemon=True,
-            name="APIServerThread"
+            target=_run, daemon=True, name="SebasAPIServer"
         )
         self.server_thread.start()

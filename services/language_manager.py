@@ -1,61 +1,99 @@
+
 """
-Language Manager for Sebas
-Responsible for detecting, switching and tracking active language.
+Language Manager
+Controls:
+    - Current system language
+    - Auto-detection from text
+    - Synchronization with STT and TTS modules
 """
 
-import logging
-from typing import Optional
-from langdetect import detect, LangDetectException
+import re
+
+SUPPORTED_LANGS = {
+    "en": {
+        "name": "English",
+        "stt_model": "vosk-en",
+        "tts_voice": "en-uk-male",
+    },
+    "ru": {
+        "name": "Russian",
+        "stt_model": "vosk-ru",
+        "tts_voice": "ru-deep-male",
+    },
+    "ja": {
+        "name": "Japanese",
+        "stt_model": "vosk-ja",
+        "tts_voice": "ja-soft-female",
+    },
+    "ka": {
+        "name": "Georgian",
+        "stt_model": "vosk-ka",
+        "tts_voice": "ka-male",
+    }
+}
 
 
 class LanguageManager:
-    def __init__(self, default_lang: str = "en"):
-        self.current_lang = default_lang.lower().strip()
-        self.supported_languages = {
-            "en": "English",
-            "ru": "Russian",
-            "uk": "Ukrainian",
-            "ge": "Georgian",
-            "de": "German",
-            "fr": "French",
-            "es": "Spanish"
-        }
+    """
+    Controls SEBAS language flow:
+        - STT → choose model
+        - TTS → choose voice
+        - NLU → normalize text
+    """
 
-    # --------------------------------------
-    # Detect language from text
-    # --------------------------------------
-    def detect_language(self, text: str) -> str:
-        try:
-            lang = detect(text)
-            if lang in self.supported_languages:
-                self.current_lang = lang
-                logging.info(f"Language detected: {lang}")
-            else:
-                logging.info(f"Language '{lang}' detected but unsupported")
-            return lang
-        except LangDetectException:
-            logging.warning("Could not detect language; using current")
-            return self.current_lang
+    def __init__(self, default_lang="en"):
+        self.current_lang = default_lang
+        self.stt = None   # will be linked by main.py
+        self.tts = None   # will be linked by main.py
 
-    # --------------------------------------
-    # Set manually
-    # --------------------------------------
+    # ------------------------------------------------------------
+    # Linking engine managers (called from main.py)
+    # ------------------------------------------------------------
+    def bind_stt(self, stt_manager):
+        self.stt = stt_manager
+
+    def bind_tts(self, tts_manager):
+        self.tts = tts_manager
+
+    # ------------------------------------------------------------
+    # Language detection
+    # ------------------------------------------------------------
+    def detect_language(self, text: str):
+        """Primitive detection. Replace with fastText later."""
+        t = text.lower()
+
+        if re.search(r"[а-яё]", t):
+            return self.set_language("ru")
+        if re.search(r"[ぁ-ゔァ-ヴ]", t):
+            return self.set_language("ja")
+        if re.search(r"მ|ქ|წ|ჭ|ღ", t):
+            return self.set_language("ka")
+
+        return self.set_language("en")
+
+    # ------------------------------------------------------------
+    # Set new language (full pipeline: STT+TTS switch)
+    # ------------------------------------------------------------
     def set_language(self, lang_code: str) -> bool:
-        code = (lang_code or "").lower().strip()
+        if lang_code not in SUPPORTED_LANGS:
+            return False
 
-        if code in self.supported_languages:
-            self.current_lang = code
-            logging.info(f"Language manually set to: {code}")
-            return True
+        self.current_lang = lang_code
+        profile = SUPPORTED_LANGS[lang_code]
 
-        logging.warning(f"Unsupported language code: {lang_code}")
-        return False
+        # Switch STT model
+        if self.stt:
+            self.stt.set_language(profile["stt_model"])
 
-    # --------------------------------------
-    # Getters
-    # --------------------------------------
-    def get_current_language(self) -> str:
+        # Switch TTS voice
+        if self.tts:
+            self.tts.selector.set_voice(profile["tts_voice"])
+
+        return True
+
+    # ------------------------------------------------------------
+    def get_current_language(self):
         return self.current_lang
 
-    def get_current_language_name(self) -> str:
-        return self.supported_languages.get(self.current_lang, "Unknown")
+    def get_current_language_name(self):
+        return SUPPORTED_LANGS[self.current_lang]["name"]

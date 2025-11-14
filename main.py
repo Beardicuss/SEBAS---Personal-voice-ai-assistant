@@ -1,14 +1,10 @@
-
 """
-SEBAS CORE MAIN CONTROLLER
-Clean, modular, scalable architecture for Jarvis-like assistant.
-This is the NEW main.py skeleton that replaces the old 3000-line monster.
+SEBAS CORE MAIN CONTROLLER – EventBus Integrated
+Clean, modular, scalable architecture for assistant.
 """
 
 import logging
-import threading
 import time
-import requests
 
 # === Core Services ===
 from sebas.permissions.permission_manager import PermissionManager
@@ -16,83 +12,114 @@ from sebas.services.language_manager import LanguageManager
 from sebas.services.skill_registry import SkillRegistry
 from sebas.services.nlu import SimpleNLU, ContextManager
 
-# === Audio Modules (mock placeholders for now) ===
+# === Audio Modules ===
 from sebas.stt.stt_manager import STTManager
 from sebas.tts.tts_manager import TTSManager
 
 # === Wake Word Module ===
-from sebas.audio.wake_word import WakeWordDetector
+from sebas.wake_word import WakeWordDetector
 
 # === UI & API ===
 from sebas.api.ui_server import start_ui_server
 from sebas.api.api_server import create_api_server
+
+# === Events ===
+from sebas.events.event_bus import EventBus
+
 
 # ============================================================
 #                       SEBAS CORE
 # ============================================================
 
 class Sebas:
-    """Central brain of the assistant. Handles flow between STT → NLU → Skills → TTS."""
+    """
+    Central brain of the assistant.
+    Handles the flow:
+        WakeWord → STT → NLU → Skills → TTS.
+    """
 
     def __init__(self):
         logging.info("Initializing Sebas assistant...")
 
-        # ----------------------------------------------
+        # --------------------------------------------------
+        # Global Event Bus
+        # --------------------------------------------------
+        self.events = EventBus()
+
+        # --------------------------------------------------
         # Language Manager
-        # ----------------------------------------------
+        # --------------------------------------------------
         self.language_manager = LanguageManager(default_lang="en")
 
-        # ----------------------------------------------
+        # --------------------------------------------------
         # Permissions / Roles
-        # ----------------------------------------------
+        # --------------------------------------------------
         self.permission_manager = PermissionManager()
-        self.user_role = "owner"   # hybrid role (admin + owner)
+        self.user_role = "owner"  # full access
 
-        # ----------------------------------------------
-        # NLU + Context
-        # ----------------------------------------------
+        # --------------------------------------------------
+        # NLU + Context Memory
+        # --------------------------------------------------
         self.nlu = SimpleNLU()
         self.context = ContextManager()
 
-        # ----------------------------------------------
+        # --------------------------------------------------
         # STT & TTS Managers
-        # ----------------------------------------------
+        # --------------------------------------------------
         self.stt = STTManager(language_manager=self.language_manager)
         self.tts = TTSManager(language_manager=self.language_manager)
 
-        # ----------------------------------------------
-        # Skill System
-        # ----------------------------------------------
-        self.skill_registry = SkillRegistry()
+        # Allow language manager to influence engines
+        self.language_manager.bind_stt(self.stt)
+        self.language_manager.bind_tts(self.tts)
+
+        # --------------------------------------------------
+        # Skill System — Auto Loader Mk.III + EventBus
+        # --------------------------------------------------
+        self.skill_registry = SkillRegistry(event_bus=self.events)
         self.skill_registry.load_skills()
 
-        # ----------------------------------------------
-        # Wake Word Detector (Porcupine for now)
-        # ----------------------------------------------
+        # --------------------------------------------------
+        # Wake Word Detector
+        # --------------------------------------------------
         self.wakeword = WakeWordDetector(callback=self._on_wake_word)
 
         logging.info("Sebas fully initialized.")
+
+        # Fire global startup event
+        self.events.emit("core.started")
 
     # ========================================================
     #                   Speech Output
     # ========================================================
     def speak(self, text: str):
-        """Send text to TTS engine."""
+        """Send text to TTS engine and emit event."""
+        if not text:
+            return
+
         logging.info(f"Sebas speaking: {text}")
+        self.events.emit("core.before_speak", text)
+
         self.tts.speak(text)
+
+        self.events.emit("core.after_speak", text)
 
     # ========================================================
     #                   Listening / STT
     # ========================================================
-    def listen(self, timeout=5):
-        """Capture user audio and transcribe."""
-        return self.stt.listen(timeout=timeout)
+    def listen(self, timeout: int = 5):
+        """Capture user audio, transcribe, and send events."""
+        self.events.emit("core.listen_start")
+        text = self.stt.listen(timeout=timeout)
+        self.events.emit("core.listen_end", text)
+        return text
 
     # ========================================================
     #             Wake Word Callback
     # ========================================================
     def _on_wake_word(self, text=None):
-        """Trigger when wake word detected."""
+        """Triggered when wake word is detected."""
+        self.events.emit("core.wake_word_detected")
         self.speak("Yes, sir?")
         command = self.listen()
         if command:
@@ -101,57 +128,73 @@ class Sebas:
     # ========================================================
     #           Command Parsing + Intent Handling
     # ========================================================
-    def parse_and_execute(self, raw_command):
-        """NLU pipeline: preprocess → detect language → get intent → run skill."""
-
+    def parse_and_execute(self, raw_command: str):
+        """NLU pipeline with event hooks."""
         if not raw_command:
             return
 
-        # Auto language detection
+        self.events.emit("core.command_received", raw_command)
+
+        # Auto language detection BEFORE lowercasing
         self.language_manager.detect_language(raw_command)
+        command = raw_command.lower().strip()
 
-        command = raw_command.lower()
-
-        # Manual language switching
+        # -------- Manual language switching --------
         if command.startswith("language ") or command.startswith("set language"):
-            lang = command.replace("set language", "").replace("language", "").strip()
+            lang = (
+                command.replace("set language", "")
+                .replace("language", "")
+                .strip()
+            )
+
             if self.language_manager.set_language(lang):
-                self.speak(f"Language set to {self.language_manager.get_current_language_name()}")
+                self.speak(
+                    f"Language set to {self.language_manager.get_current_language_name()}"
+                )
             else:
                 self.speak("Unsupported language.")
             return
 
-        # Run NLU
+        # -------- Natural Language Understanding --------
         intent, suggestions = self.nlu.get_intent_with_confidence(command)
 
         if not intent:
+            self.events.emit("core.intent_failed")
             self.speak("I did not understand, sir.")
             return
 
-        # Save context
-        self.context.add({
-            "type": "intent",
-            "name": intent.name,
-            "slots": intent.slots,
-            "confidence": intent.confidence
-        })
+        self.events.emit("core.intent_detected", intent)
 
-        # Check permissions
+        # Save context
+        self.context.add(
+            {
+                "type": "intent",
+                "name": intent.name,
+                "slots": intent.slots,
+                "confidence": intent.confidence,
+            }
+        )
+
+        # -------- Permission Check --------
         if not self.permission_manager.has_permission(self.user_role, intent.name):
+            self.events.emit("core.permission_denied", intent)
             self.speak("You do not have permission for this action.")
             return
 
-        # Dispatch skill
-        handled = self.skill_registry.handle_intent(intent.name, intent.slots)
+        # -------- Dispatch to Skills --------
+        handled = self.skill_registry.handle_intent(intent.name, intent.slots, self)
 
-        if not handled:
+        if handled:
+            self.events.emit("core.intent_handled", intent)
+        else:
+            self.events.emit("core.intent_unhandled", intent)
             self.speak("This command is not implemented yet, sir.")
 
     # ========================================================
     #               Startup Routine
     # ========================================================
     def start(self):
-        """Start wake word thread + speak greeting."""
+        """Start wake word thread and speak greeting."""
         self.speak("Sebas online and awaiting your orders, sir.")
         self.wakeword.start()
 
@@ -165,16 +208,15 @@ if __name__ == "__main__":
 
     assistant = Sebas()
 
-    # Start UI server
     start_ui_server()
-
-    # Start API server
-    api = create_api_server(sebas_instance=assistant, host="127.0.0.1", port=5002)
+    api = create_api_server(
+        sebas_instance=assistant,
+        host="127.0.0.1",
+        port=5002
+    )
     api.start()
 
-    # Start assistant core loop
     assistant.start()
 
-    # Keep alive
     while True:
         time.sleep(1)

@@ -1,84 +1,142 @@
+"""
+SEBAS UI Server (EventBus Integrated)
+
+Purpose:
+    Serve UI (index.html + assets)
+    Provide:
+        - POST /api/command
+        - GET/POST /api/state
+        - POST /api/level
+"""
+
 import os
 import sys
 import threading
-from sebas.flask import Flask, send_from_directory, jsonify, request
-from sebas.typing import Callable, Optional
+from typing import Callable, Optional
+from flask import Flask, send_from_directory, request, jsonify
+
+# ============================================================
+#                 GLOBAL STATE + COMMAND HANDLER
+# ============================================================
 
 _state = {
-    "mic": "idle",        # idle|listening
-    "processing": False,   # True|False
-    "system": "ok",       # ok|error|busy
-    "level": 0.0           # 0..1
+    "mic": "idle",        # idle | listening
+    "processing": False,
+    "system": "ok",
+    "level": 0.0,
 }
-
-_app = Flask(__name__)
-
-# Resolve UI directory for both source and PyInstaller-frozen builds
-if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-    _root = sys._MEIPASS  # type: ignore[attr-defined]
-else:
-    # Go up one level from api folder to project root, then into ui folder
-    _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
-_ui_dir = os.path.join(_root, "ui")
 
 _command_handler: Optional[Callable[[str], str]] = None
 
-def set_command_handler(handler: Callable[[str], str]) -> None:
+
+# ============================================================
+#                 UI DIRECTORY RESOLUTION
+# ============================================================
+
+def _resolve_ui_dir() -> str:
+    """
+    Locate UI directory in both:
+        - PyInstaller build
+        - Dev environment
+    """
+    base = os.path.dirname(os.path.abspath(__file__))  # sebas/api
+    project_root = os.path.dirname(base)               # sebas/
+
+    # PyInstaller bundle
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, "ui")
+
+    return os.path.join(project_root, "ui")
+
+
+UI_DIR = _resolve_ui_dir()
+
+app = Flask(__name__)
+
+
+# ============================================================
+#                 COMMAND HANDLER REGISTRATION
+# ============================================================
+
+def set_command_handler(callback: Callable[[str], str]):
+    """Sebas core registers its parser here."""
     global _command_handler
-    _command_handler = handler
+    _command_handler = callback
 
-@_app.route("/")
+
+# ============================================================
+#                          ROUTES
+# ============================================================
+
+@app.route("/")
 def index():
-    return send_from_directory(_ui_dir, "index.html")
-
-@_app.route("/ui/<path:path>")
-def ui_static(path):
-    return send_from_directory(_ui_dir, path)
+    return send_from_directory(UI_DIR, "index.html")
 
 
-@_app.route("/api/status", methods=["GET", "POST"])
-def api_status():
+@app.route("/ui/<path:path>")
+def static_files(path):
+    return send_from_directory(UI_DIR, path)
+
+
+@app.route("/api/state", methods=["GET", "POST"])
+def api_state():
     global _state
+
     if request.method == "POST":
-        data = request.get_json(silent=True) or {}
-        for k in ("mic", "processing", "system"):
-            if k in data:
-                _state[k] = data[k]
+        data = request.get_json() or {}
+        for key in ("mic", "processing", "system"):
+            if key in data:
+                _state[key] = data[key]
         return jsonify({"ok": True})
+
     return jsonify(_state)
 
 
-@_app.route("/api/level", methods=["POST"]) 
+@app.route("/api/level", methods=["POST"])
 def api_level():
     global _state
-    data = request.get_json(silent=True) or {}
+    data = request.get_json() or {}
+
     try:
         lvl = float(data.get("level", 0.0))
         _state["level"] = max(0.0, min(1.0, lvl))
-    except Exception:
+    except:
         _state["level"] = 0.0
+
     return jsonify({"ok": True})
 
 
-@_app.route("/api/command", methods=["POST"])
+@app.route("/api/command", methods=["POST"])
 def api_command():
-    data = request.get_json(silent=True) or {}
+    """Text -> Sebas Core Pipeline"""
+    global _command_handler
+
+    if _command_handler is None:
+        return jsonify({"ok": False, "error": "handler_not_ready"}), 503
+
+    data = request.get_json() or {}
     text = str(data.get("text", "")).strip()
+
     if not text:
         return jsonify({"ok": False, "error": "empty"}), 400
-    if _command_handler is None:
-        return jsonify({"ok": False, "error": "no_handler"}), 503
+
     try:
         result = _command_handler(text)
         return jsonify({"ok": True, "result": result or ""})
-    except Exception:
-        return jsonify({"ok": False, "error": "failed"}), 500
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "exception", "details": str(ex)}), 500
 
 
-def start_ui_server(host: str = "127.0.0.1", port: int = 5000):
+# ============================================================
+#                     SERVER STARTER
+# ============================================================
+
+def start_ui_server(host="127.0.0.1", port=5000):
+    """
+    Runs in background thread.
+    """
     def _run():
-        _app.run(host=host, port=port, debug=False, use_reloader=False)
+        app.run(host=host, port=port, debug=False, use_reloader=False)
 
     t = threading.Thread(target=_run, daemon=True)
     t.start()
