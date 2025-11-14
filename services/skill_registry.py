@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Skill Registry - Stage 1 Mk.I
-Dynamically loads and manages SEBAS skills
+Skill Registry - Stage 1 Mk.I FIXED
+Properly passes assistant reference to skills
 """
 
 import os
@@ -23,14 +23,13 @@ class SkillRegistry:
             assistant_ref: Reference to the main assistant instance
             skills_dir: Directory where skills are located
         """
-
         self.assistant = assistant_ref
-
-        # FIX #1: Always load skills from sebas/skills no matter where run.py is executed
-        base_dir = os.path.dirname(os.path.abspath(__file__))   # sebas/services/
+        
+        # Always load skills from sebas/skills
+        base_dir = os.path.dirname(os.path.abspath(__file__))
         real_skills_dir = os.path.join(base_dir, "..", "skills")
-
         self.skills_dir = os.path.abspath(real_skills_dir)
+        
         self.skills: List[BaseSkill] = []
         self.logger = logging.getLogger(__name__)
 
@@ -38,7 +37,6 @@ class SkillRegistry:
 
     def _load_all_skills(self):
         """Load all skills from the skills directory."""
-
         if not os.path.exists(self.skills_dir):
             self.logger.error(f"Skills directory not found at: {self.skills_dir}")
             return
@@ -93,11 +91,23 @@ class SkillRegistry:
         return None
 
     def handle_intent(self, intent: str, slots: Dict[str, Any]) -> bool:
-        """Handle an intent using the appropriate skill."""
+        """
+        Handle an intent using the appropriate skill.
+        Properly passes assistant reference for backward compatibility.
+        """
         skill = self.get_skill_for_intent(intent)
         if skill:
             try:
-                return skill.handle(intent, slots)
+                # Check if skill.handle accepts 3 arguments (old style)
+                import inspect
+                sig = inspect.signature(skill.handle)
+                params = list(sig.parameters.keys())
+                
+                if len(params) == 3:  # (intent, slots, sebas)
+                    return skill.handle(intent, slots, self.assistant)
+                else:  # (intent, slots)
+                    return skill.handle(intent, slots)
+                    
             except Exception:
                 self.logger.exception(f"Error in skill {skill.__class__.__name__} handling {intent}")
                 return False

@@ -1,25 +1,22 @@
 """
-SEBAS – Modular AI Assistant Framework
-Package initializer for the SEBAS ecosystem.
-
-This file exposes only stable, public-facing entry points.
-Internal modules remain encapsulated in their subpackages.
+SEBAS – Stage 1 Mk.I Package
+Modular AI Assistant Framework
 """
 
-# Public API surface
+__version__ = "1.0.0-stage1"
+__author__ = "Dante"
+
+# Public API - import only what's needed and safe
 __all__ = [
-    "Sebas",
-    "create_api_server",
-    "start_ui_server",
     "EventBus",
 ]
 
-# --- Core ---
-from .main import Sebas
+# Minimal imports - avoid circular dependencies
+try:
+    from .events.event_bus import EventBus
+except ImportError:
+    EventBus = None
 
-# --- UI & API Servers ---
-from .api.api_server import create_api_server
-from .api.ui_server import start_ui_server
-
-# --- Events ---
-from .events.event_bus import EventBus
+# Don't import main.py here - it causes circular dependencies
+# Users should run via run.py or import directly:
+# from sebas.main import Sebas, main

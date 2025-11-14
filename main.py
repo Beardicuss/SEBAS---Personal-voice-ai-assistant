@@ -1,6 +1,6 @@
 """
-SEBAS CORE MAIN CONTROLLER – Stage 1 Mk.I FINAL
-Clean, modular, stable architecture for voice assistant.
+SEBAS CORE MAIN CONTROLLER – Stage 1 Mk.I ENHANCED
+Fixed: Voice and typed command processing
 """
 
 import logging
@@ -32,73 +32,52 @@ from sebas.events.event_bus import EventBus
 from sebas.constants.permissions import Role, is_authorized
 
 
-# ============================================================
-#                       SEBAS CORE
-# ============================================================
-
 class Sebas:
     """
     Central brain of the assistant.
-    Handles the flow:
-        WakeWord → STT → NLU → Skills → TTS.
+    Enhanced with proper command handling.
     """
 
     def __init__(self):
-        logging.info("🚀 Initializing SEBAS Stage 1 Mk.I...")
+        logging.info("🚀 Initializing SEBAS Stage 1 Mk.I Enhanced...")
 
-        # --------------------------------------------------
         # Global Event Bus
-        # --------------------------------------------------
         self.events = EventBus()
 
-        # --------------------------------------------------
         # Language Manager
-        # --------------------------------------------------
         self.language_manager = LanguageManager(default_lang="en")
 
-        # --------------------------------------------------
         # Permissions / Roles
-        # --------------------------------------------------
         self.permission_manager = PermissionManager()
-        self.user_role = Role.ADMIN_OWNER  # Full access for owner
+        self.user_role = Role.ADMIN_OWNER
 
-        # --------------------------------------------------
         # NLU + Context Memory
-        # --------------------------------------------------
         self.nlu = SimpleNLU()
         self.context = ContextManager()
 
-        # --------------------------------------------------
         # STT & TTS Managers
-        # --------------------------------------------------
         self.stt = STTManager(language_manager=self.language_manager)
         self.tts = TTSManager(language_manager=self.language_manager)
 
-        # Bind language manager to voice + recognition systems
+        # Bind language manager
         self.language_manager.bind_stt(self.stt)
         self.language_manager.bind_tts(self.tts)
 
-        # --------------------------------------------------
-        # Skill System — Auto Loader
-        # --------------------------------------------------
+        # Skill System
         self.skill_registry = SkillRegistry(
             assistant_ref=self,
             skills_dir="skills"
         )
 
-        # --------------------------------------------------
         # Wake Word Detector
-        # --------------------------------------------------
         self.wakeword = WakeWordDetector(callback=self._on_wake_word)
+        
+        # Track processing state
+        self.is_processing = False
 
         logging.info("✅ SEBAS Stage 1 fully initialized.")
-
-        # Emit startup event
         self.events.emit("core.started", None)
 
-    # ========================================================
-    #                   Speech Output
-    # ========================================================
     def speak(self, text: str):
         """Send text to TTS engine and emit events."""
         if not text:
@@ -106,36 +85,36 @@ class Sebas:
 
         logging.info(f"🗣️ SEBAS speaking: {text}")
         self.events.emit("core.before_speak", text)
-
         self.tts.speak(text)
-
         self.events.emit("core.after_speak", text)
 
-    # ========================================================
-    #                   Listening / STT
-    # ========================================================
     def listen(self, timeout: int = 5) -> str:
-        """Capture user audio, transcribe, and send events."""
+        """Capture user audio and transcribe."""
         self.events.emit("core.listen_start", None)
-        text = self.stt.listen(timeout=timeout)
+        logging.info("👂 Listening for voice input...")
+        text = self.stt.listen(timeout=timeout) or ""
+        logging.info(f"📝 Recognized: {text}")
         self.events.emit("core.listen_end", text)
         return text
 
-    # ========================================================
-    #             Wake Word Callback
-    # ========================================================
     def _on_wake_word(self, data=None):
         """Triggered when wake word is detected."""
+        if self.is_processing:
+            logging.info("⏳ Already processing a command, ignoring wake word")
+            return
+            
         logging.info("👂 Wake word detected!")
         self.events.emit("core.wake_word_detected", None)
         self.speak("Yes, sir?")
-        command = self.listen()
-        if command:
-            self.parse_and_execute(command)
+        
+        self.is_processing = True
+        try:
+            command = self.listen()
+            if command:
+                self.parse_and_execute(command)
+        finally:
+            self.is_processing = False
 
-    # ========================================================
-    #           Command Parsing + Intent Handling
-    # ========================================================
     def parse_and_execute(self, raw_command: str) -> str:
         """
         NLU pipeline with event hooks.
@@ -144,19 +123,16 @@ class Sebas:
         if not raw_command:
             return "No command received"
 
+        logging.info(f"📥 Processing command: {raw_command}")
         self.events.emit("core.command_received", raw_command)
 
-        # Detect language BEFORE lowercasing
+        # Detect language
         self.language_manager.detect_language(raw_command)
         command = raw_command.lower().strip()
 
-        # -------- Manual language switching --------
+        # Language switching
         if command.startswith("language ") or command.startswith("set language"):
-            lang = (
-                command.replace("set language", "")
-                .replace("language", "")
-                .strip()
-            )
+            lang = command.replace("set language", "").replace("language", "").strip()
             if self.language_manager.set_language(lang):
                 msg = f"Language set to {self.language_manager.get_current_language_name()}"
                 self.speak(msg)
@@ -166,7 +142,7 @@ class Sebas:
                 self.speak(msg)
                 return msg
 
-        # -------- Natural Language Understanding --------
+        # NLU Processing
         intent, suggestions = self.nlu.get_intent_with_confidence(command)
 
         if not intent:
@@ -175,49 +151,53 @@ class Sebas:
             self.speak(msg)
             return msg
 
+        logging.info(f"🎯 Intent detected: {intent.name} (confidence: {intent.confidence})")
         self.events.emit("core.intent_detected", intent)
 
         # Save context
-        self.context.add(
-            {
-                "type": "intent",
-                "name": intent.name,
-                "slots": intent.slots,
-                "confidence": intent.confidence,
-            }
-        )
+        self.context.add({
+            "type": "intent",
+            "name": intent.name,
+            "slots": intent.slots,
+            "confidence": intent.confidence,
+        })
 
-        # -------- Permission Check --------
+        # Permission Check
         if not is_authorized(self.user_role, intent.name):
             self.events.emit("core.permission_denied", intent)
             msg = "You do not have permission for this action."
             self.speak(msg)
             return msg
 
-        # -------- Dispatch to Skills --------
-        handled = self.skill_registry.handle_intent(intent.name, intent.slots)
+        # Dispatch to Skills
+        # Pass 'self' as third argument for backward compatibility with old skills
+        try:
+            handled = self.skill_registry.handle_intent(intent.name, intent.slots)
+        except TypeError:
+            # Fallback for skills that expect (intent, slots, sebas)
+            skill = self.skill_registry.get_skill_for_intent(intent.name)
+            if skill and hasattr(skill, 'handle'):
+                handled = skill.handle(intent.name, intent.slots, self)
+            else:
+                handled = False
 
         if handled:
             self.events.emit("core.intent_handled", intent)
-            return f"Command executed: {intent.name}"
+            msg = f"Command executed: {intent.name}"
+            logging.info(f"✅ {msg}")
+            return msg
         else:
             self.events.emit("core.intent_unhandled", intent)
             msg = "This command is not implemented yet, sir."
             self.speak(msg)
             return msg
 
-    # ========================================================
-    #               Startup Routine
-    # ========================================================
     def start(self):
         """Start wake word thread and speak greeting."""
         self.speak("SEBAS Stage 1 online and awaiting your orders, sir.")
         self.wakeword.start()
+        logging.info("🎤 Wake word detection started")
 
-
-# ============================================================
-#                       ENTRYPOINT
-# ============================================================
 
 def main():
     """Main entry point for SEBAS Stage 1."""
@@ -233,7 +213,7 @@ def main():
     )
 
     logging.info("=" * 60)
-    logging.info("🎯 SEBAS STAGE 1 Mk.I - STARTING")
+    logging.info("🎯 SEBAS STAGE 1 Mk.I ENHANCED - STARTING")
     logging.info("=" * 60)
 
     try:
@@ -262,6 +242,8 @@ def main():
 
         logging.info("✅ SEBAS Stage 1 is RUNNING")
         logging.info("👉 Open http://127.0.0.1:5000 in your browser")
+        logging.info("🎤 Say 'SEBAS' followed by your command")
+        logging.info("⌨️  Or type commands in the web UI")
         logging.info("Press Ctrl+C to exit")
 
         # Keep process alive
