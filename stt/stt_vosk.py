@@ -2,7 +2,8 @@ import speech_recognition as sr
 import logging
 
 class VoskRecognizer:
-    def __init__(self):
+    def __init__(self, model_name: str = None):
+        self.model_name = model_name
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
 
