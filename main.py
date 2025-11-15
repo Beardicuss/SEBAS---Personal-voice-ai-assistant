@@ -129,10 +129,36 @@ class Sebas:
     # ========================================================
     #             Wake Word Callback
     # ========================================================
-    def _on_wake_word(self, data=None):
-        """Triggered when wake word is detected."""
-        logging.info("[WakeWord] Detected!")
-        self.events.emit("core.wake_word_detected", None)
+    def _on_wake_word(self, detected_text=None):
+        """
+        Triggered when wake word is detected.
+        
+        Args:
+            detected_text: The full text that was recognized (e.g., "sebas open notepad")
+        """
+        logging.info(f"[WakeWord] Detected! Text: '{detected_text}'")
+        self.events.emit("core.wake_word_detected", detected_text)
+        
+        # Check if command was included in the wake word detection
+        if detected_text and isinstance(detected_text, str):
+            # Remove the wake word from the text to extract the command
+            keyword = self.wakeword.keyword
+            detected_lower = detected_text.lower()
+            
+            if keyword in detected_lower:
+                # Extract command after wake word
+                # e.g., "sebas open notepad" -> "open notepad"
+                parts = detected_lower.split(keyword, 1)
+                if len(parts) > 1:
+                    command = parts[1].strip()
+                    if command:
+                        logging.info(f"[WakeWord] Command detected in wake phrase: '{command}'")
+                        self.speak("Yes, sir?")
+                        # Execute the command directly
+                        self.parse_and_execute(command)
+                        return
+        
+        # No command detected, ask for one
         self.speak("Yes, sir?")
         command = self.listen()
         if command:
@@ -271,6 +297,7 @@ def main():
         logging.info("[SEBAS] Stage 1 is RUNNING")
         logging.info("[INFO] Open http://127.0.0.1:5000 in your browser")
         logging.info("[INFO] Say 'SEBAS' followed by your command")
+        logging.info("[INFO] Example: 'SEBAS open notepad' or 'SEBAS what time is it'")
         logging.info("[INFO] Or type commands in the web UI")
         logging.info("Press Ctrl+C to exit")
 

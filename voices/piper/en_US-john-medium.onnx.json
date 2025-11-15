@@ -16,9 +16,9 @@
     "country_english": "United States"
   },
   "inference": {
-    "noise_scale": 0.667,
-    "length_scale": 1,
-    "noise_w": 0.8
+    "noise_scale": 0.85,
+    "length_scale": 0.92,
+    "noise_w": 1.2
   },
   "phoneme_type": "espeak",
   "phoneme_map": {},

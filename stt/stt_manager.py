@@ -29,27 +29,30 @@ class STTManager:
     """
     
     def __init__(self, language_manager=None):
+        print("[STT DEBUG] STTManager.__init__() called")  # Use print, not logging
         self.language_manager = language_manager
         self.model = None
-        self.recognizer = None  # Type will be vosk.KaldiRecognizer when loaded
+        self.recognizer = None
         self.engine = None
         self.mode = "none"
         
-        # Audio configuration (for when Vosk is available)
+        # Audio configuration
         self.RATE = 16000
         self.CHUNK = 8000
-        self.FORMAT = None  # Will be set to pyaudio.paInt16 if available
+        self.FORMAT = None
         self.CHANNELS = 1
-        
-        # PyAudio instance placeholder
         self.pa_format = None
         
-        # Try to initialize Vosk
+        print("[STT DEBUG] About to call _init_vosk()")
         self._init_vosk()
+        print(f"[STT DEBUG] After _init_vosk(), mode={self.mode}")
     
     def _init_vosk(self):
         """Try to initialize Vosk, fallback gracefully"""
+        print(f"[STT DEBUG] _init_vosk() called, VOSK_AVAILABLE={VOSK_AVAILABLE}")
+        
         if not VOSK_AVAILABLE:
+            print("[STT DEBUG] Vosk not installed")
             logging.warning("[STT] Vosk not installed - using text input")
             self.mode = "text_input"
             self.engine = NoSTT()
@@ -82,7 +85,7 @@ class STTManager:
         try:
             import pyaudio
             self.FORMAT = pyaudio.paInt16
-            self.pa_format = pyaudio.paInt16  # Store for later use
+            self.pa_format = pyaudio.paInt16
             
             # FIX: Convert WindowsPath to string
             model_path_str = str(model_path)
@@ -93,39 +96,40 @@ class STTManager:
             logging.info(f"[STT] Vosk initialized from {model_path}")
             
         except Exception as e:
-            logging.exception(f"[STT] Failed to load Vosk: {e}")
+            logging.exception(f"[STT] Failed to load Vosk: {e}")  # This should show in logs
             logging.warning("[STT] Falling back to text input")
             self.mode = "text_input"
             self.engine = NoSTT()
-        def listen(self, timeout: int = 5) -> str:
-            """
-            Listen to user input (audio or text fallback)
+
+    def listen(self, timeout: int = 5) -> str:
+        """
+        Listen to user input (audio or text fallback)
+        
+        Args:
+            timeout: Maximum seconds to listen (Vosk mode)
             
-            Args:
-                timeout: Maximum seconds to listen (Vosk mode)
-                
-            Returns:
-                Transcribed text or empty string
-            """
-            
-            # TEXT INPUT FALLBACK MODE
-            if self.mode == "text_input":
-                logging.info("[STT] Text input mode - type your command:")
-                try:
-                    text = input("You: ").strip()
-                    if text:
-                        logging.info(f"[STT] Received: {text}")
-                    return text
-                except (EOFError, KeyboardInterrupt):
-                    return ""
-            
-            # VOSK AUDIO MODE
-            if self.mode == "vosk" and self.recognizer:
-                return self._listen_vosk(timeout)
-            
-            # NO STT AVAILABLE
-            logging.error("[STT] No speech recognition available")
-            return ""
+        Returns:
+            Transcribed text or empty string
+        """
+        
+        # TEXT INPUT FALLBACK MODE
+        if self.mode == "text_input":
+            logging.info("[STT] Text input mode - type your command:")
+            try:
+                text = input("You: ").strip()
+                if text:
+                    logging.info(f"[STT] Received: {text}")
+                return text
+            except (EOFError, KeyboardInterrupt):
+                return ""
+        
+        # VOSK AUDIO MODE
+        if self.mode == "vosk" and self.recognizer:
+            return self._listen_vosk(timeout)
+        
+        # NO STT AVAILABLE
+        logging.error("[STT] No speech recognition available")
+        return ""
     
     def _listen_vosk(self, timeout: int) -> str:
         """Listen using Vosk (original implementation)"""
