@@ -61,11 +61,16 @@ class STTManager:
         base_dir = Path(__file__).resolve().parent.parent
 
         model_paths = [
+            # English models
             base_dir / "model" / "vosk-model-small-en-us-0.15",
             base_dir / "model" / "vosk-model-small-en-us",
             Path(os.path.expanduser("~/vosk-model-small-en-us-0.15")),
+
+            # Russian models
+            base_dir / "model" / "vosk-model-small-ru-0.22",
+            Path(os.path.expanduser("~/vosk-model-small-ru-0.22")),
         ]
-        
+   
         model_path = None
         for path in model_paths:
             if os.path.exists(path):

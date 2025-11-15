@@ -5,6 +5,7 @@ import threading
 import queue
 from pathlib import Path
 from typing import Optional, Union
+import numpy as np
 
 try:
     from piper import PiperVoice
@@ -80,10 +81,6 @@ class PiperTTS:
             logging.info(f"[PiperTTS] Voice loaded successfully")
             logging.info(f"[PiperTTS] Sample rate: {self.voice.config.sample_rate} Hz")
             
-            # Log available methods for debugging
-            methods = [m for m in dir(self.voice) if not m.startswith('_') and callable(getattr(self.voice, m))]
-            logging.info(f"[PiperTTS] Available methods: {', '.join(methods)}")
-            
             # Extract language information safely
             language_info = self._get_language_info()
             logging.info(f"[PiperTTS] Language: {language_info}")
@@ -156,7 +153,7 @@ class PiperTTS:
         logging.info("[PiperTTS] Speech worker stopped")
     
     def _do_speak(self, text: str):
-        """Synthesize and play speech using multiple fallback methods."""
+        """Synthesize and play speech using the correct Piper API."""
         if not self.voice:
             logging.error("[PiperTTS] Voice not loaded")
             return
@@ -166,157 +163,74 @@ class PiperTTS:
             self._is_speaking = True
             
             sample_rate = self.voice.config.sample_rate
-            audio_np = None
             
-            # ==== METHOD 1: Direct generator with AudioChunk objects (newest API) ====
-            if audio_np is None:
-                try:
-                    logging.info("[PiperTTS] Method 1: Trying direct generator...")
-                    result = self.voice.synthesize(text)
-                    
-                    # Check if result is iterable (generator)
-                    if hasattr(result, '__iter__') and not isinstance(result, (str, bytes)):
-                        audio_chunks = []
-                        for chunk in result:
-                            # Handle AudioChunk objects (modern Piper API)
-                            if hasattr(chunk, 'audio_float_array'):
-                                # Extract float32 audio data directly
-                                audio_chunks.append(chunk.audio_float_array)
-                                logging.debug(f"[PiperTTS] Got AudioChunk with {len(chunk.audio_float_array)} samples")
-                            # Handle raw numpy arrays
-                            elif isinstance(chunk, np.ndarray):
-                                audio_chunks.append(chunk)
-                            # Handle raw bytes
-                            elif isinstance(chunk, bytes):
-                                chunk_array = np.frombuffer(chunk, dtype=np.int16)
-                                audio_chunks.append(chunk_array)
-                        
-                        if audio_chunks:
-                            # Concatenate all chunks
-                            audio_float = np.concatenate(audio_chunks)
-                            
-                            # Check if already float or needs conversion
-                            if audio_float.dtype == np.float32:
-                                logging.info(f"[PiperTTS] Method 1 SUCCESS: {len(audio_float)} float32 samples")
-                            else:
-                                # Convert int16 to float32
-                                audio_float = audio_float.astype(np.float32) / 32768.0
-                                logging.info(f"[PiperTTS] Method 1 SUCCESS: {len(audio_float)} samples (converted)")
-                            
-                            # Store as audio_np for playback (will be converted again below, so convert back)
-                            audio_np = (audio_float * 32768.0).astype(np.int16)
-                except Exception as e:
-                    logging.debug(f"[PiperTTS] Method 1 failed: {e}")
-                    import traceback
-                    logging.debug(traceback.format_exc())
+            # The correct way: synthesize() returns a generator of AudioChunk objects
+            # Each AudioChunk has a .audio_float_array attribute (numpy array of float32)
+            logging.info("[PiperTTS] Calling synthesize()...")
+            audio_chunks = []
             
-            # ==== METHOD 2: Write to WAV file directly ====
-            if audio_np is None:
-                try:
-                    logging.info("[PiperTTS] Method 2: Trying direct file write...")
-                    temp_file = Path("temp_piper_output.wav")
-                    
-                    # Use synthesize with file path as string
-                    with wave.open(str(temp_file), 'wb') as wav_file:
-                        wav_file.setnchannels(1)
-                        wav_file.setsampwidth(2)
-                        wav_file.setframerate(sample_rate)
-                        
-                        # Try passing the wave file object
-                        try:
-                            self.voice.synthesize(text, wav_file)
-                        except TypeError:
-                            # Maybe it wants just the filename
-                            pass
-                    
-                    # If file was created and has data, read it
-                    if temp_file.exists() and temp_file.stat().st_size > 44:
-                        with wave.open(str(temp_file), 'rb') as wav_file:
-                            audio_data = wav_file.readframes(wav_file.getnframes())
-                        
-                        audio_np = np.frombuffer(audio_data, dtype=np.int16)
-                        logging.info(f"[PiperTTS] Method 2 SUCCESS: {len(audio_np)} samples")
-                        
-                        # Clean up
-                        try:
-                            temp_file.unlink()
-                        except:
-                            pass
-                    else:
-                        raise ValueError("File synthesis produced no data")
-                        
-                except Exception as e:
-                    logging.debug(f"[PiperTTS] Method 2 failed: {e}")
+            for audio_chunk in self.voice.synthesize(text):
+                # audio_chunk is an AudioChunk object with audio_float_array attribute
+                if hasattr(audio_chunk, 'audio_float_array'):
+                    audio_chunks.append(audio_chunk.audio_float_array)
+                    logging.debug(f"[PiperTTS] Got chunk with {len(audio_chunk.audio_float_array)} samples")
+                else:
+                    logging.warning(f"[PiperTTS] Unknown chunk type: {type(audio_chunk)}")
             
-            # ==== METHOD 3: Use PiperVoice internal synthesize to file method ====
-            if audio_np is None:
-                try:
-                    logging.info("[PiperTTS] Method 3: Trying synthesize_to_file if available...")
-                    temp_file = Path("temp_piper_output.wav")
-                    
-                    if hasattr(self.voice, 'synthesize_to_file'):
-                        self.voice.synthesize_to_file(text, str(temp_file))
-                        
-                        if temp_file.exists() and temp_file.stat().st_size > 44:
-                            with wave.open(str(temp_file), 'rb') as wav_file:
-                                audio_data = wav_file.readframes(wav_file.getnframes())
-                            
-                            audio_np = np.frombuffer(audio_data, dtype=np.int16)
-                            logging.info(f"[PiperTTS] Method 3 SUCCESS: {len(audio_np)} samples")
-                            
-                            try:
-                                temp_file.unlink()
-                            except:
-                                pass
-                    else:
-                        raise AttributeError("synthesize_to_file not available")
-                        
-                except Exception as e:
-                    logging.debug(f"[PiperTTS] Method 3 failed: {e}")
-            
-            # ==== METHOD 4: Try using onnx directly (last resort) ====
-            if audio_np is None:
-                try:
-                    logging.info("[PiperTTS] Method 4: Trying direct ONNX inference...")
-                    
-                    # This is a more direct approach using Piper's internal methods
-                    if hasattr(self.voice, 'phonemize'):
-                        phonemes = self.voice.phonemize(text)
-                        if hasattr(self.voice, 'phonemes_to_ids'):
-                            phoneme_ids = self.voice.phonemes_to_ids(phonemes)
-                            if hasattr(self.voice, 'synthesize_ids_to_audio'):
-                                audio_np = self.voice.synthesize_ids_to_audio(phoneme_ids)
-                                logging.info(f"[PiperTTS] Method 4 SUCCESS: {len(audio_np)} samples")
-                    else:
-                        raise AttributeError("Direct ONNX methods not available")
-                        
-                except Exception as e:
-                    logging.debug(f"[PiperTTS] Method 4 failed: {e}")
-            
-            # ==== FINAL CHECK ====
-            if audio_np is None or len(audio_np) == 0:
-                logging.error("[PiperTTS] ❌ ALL METHODS FAILED - No audio produced!")
-                logging.error("[PiperTTS] This may indicate:")
-                logging.error("[PiperTTS]   1. Incompatible Piper version")
-                logging.error("[PiperTTS]   2. Corrupted model files")
-                logging.error("[PiperTTS]   3. Missing dependencies")
-                logging.error("[PiperTTS] Try: pip install --upgrade piper-tts")
+            if not audio_chunks:
+                logging.error("[PiperTTS] No audio chunks received!")
                 return
             
-            # Convert to float32 for playback if not already
-            if audio_np.dtype == np.float32:
-                audio_float = audio_np
-            else:
-                audio_float = audio_np.astype(np.float32) / 32768.0
+            # Concatenate all chunks into a single array
+            audio_float = np.concatenate(audio_chunks)
+            logging.info(f"[PiperTTS] ✓ Generated {len(audio_float)} samples")
+            
+            # Ensure it's float32
+            if audio_float.dtype != np.float32:
+                audio_float = audio_float.astype(np.float32)
             
             # Play the audio
-            logging.info(f"[PiperTTS] ✓ Playing {len(audio_float)} samples at {sample_rate} Hz")
+            logging.info(f"[PiperTTS] Playing audio at {sample_rate} Hz...")
             sd.play(audio_float, sample_rate, blocking=True)
             sd.wait()
             logging.info("[PiperTTS] ✓ Speech completed successfully!")
                 
         except Exception as e:
             logging.exception(f"[PiperTTS] ❌ Failed to synthesize/play: {e}")
+            
+            # Try fallback method: write to WAV and read back
+            try:
+                logging.info("[PiperTTS] Trying fallback: WAV file method...")
+                wav_buffer = io.BytesIO()
+                
+                with wave.open(wav_buffer, 'wb') as wav_file:
+                    wav_file.setnchannels(1)
+                    wav_file.setsampwidth(2)
+                    wav_file.setframerate(sample_rate)
+                    
+                    # Generate audio chunks and write as int16
+                    for audio_chunk in self.voice.synthesize(text):
+                        if hasattr(audio_chunk, 'audio_float_array'):
+                            # Convert float32 to int16
+                            audio_int16 = (audio_chunk.audio_float_array * 32767).astype(np.int16)
+                            wav_file.writeframes(audio_int16.tobytes())
+                
+                # Read back from buffer
+                wav_buffer.seek(0)
+                with wave.open(wav_buffer, 'rb') as wav_file:
+                    audio_data = wav_file.readframes(wav_file.getnframes())
+                
+                # Convert back to float32 for playback
+                audio_int16 = np.frombuffer(audio_data, dtype=np.int16)
+                audio_float = audio_int16.astype(np.float32) / 32767.0
+                
+                logging.info(f"[PiperTTS] Fallback: Playing {len(audio_float)} samples...")
+                sd.play(audio_float, sample_rate, blocking=True)
+                sd.wait()
+                logging.info("[PiperTTS] ✓ Fallback method succeeded!")
+                
+            except Exception as fallback_error:
+                logging.exception(f"[PiperTTS] ❌ Fallback method also failed: {fallback_error}")
         finally:
             self._is_speaking = False
             
