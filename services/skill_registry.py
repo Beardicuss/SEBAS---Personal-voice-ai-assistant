@@ -77,7 +77,7 @@ class SkillRegistry:
 
             skill_instance = skill_class(self.assistant)
             self.skills.append(skill_instance)
-            self.logger.info(f"✓ Loaded skill: {skill_class.__name__}")
+            self.logger.info(f" Loaded skill: {skill_class.__name__}")
 
         except Exception as e:
             self.logger.error(f"✗ Error loading skill {module_name}: {e}")

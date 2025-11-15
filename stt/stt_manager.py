@@ -5,6 +5,7 @@ With graceful fallback if Vosk not available
 
 import logging
 import os
+from pathlib import Path
 
 # Try to import Vosk
 try:
@@ -54,11 +55,12 @@ class STTManager:
             self.engine = NoSTT()
             return
         
-        # Try to find a model
+        base_dir = Path(__file__).resolve().parent.parent
+
         model_paths = [
-            "model/vosk-model-small-en-us-0.15",
-            "vosk-model-small-en-us",
-            os.path.expanduser("~/vosk-models/vosk-model-small-en-us-0.15"),
+            base_dir / "model" / "vosk-model-small-en-us-0.15",
+            base_dir / "model" / "vosk-model-small-en-us",
+            Path(os.path.expanduser("~/vosk-model-small-en-us-0.15")),
         ]
         
         model_path = None
@@ -82,7 +84,9 @@ class STTManager:
             self.FORMAT = pyaudio.paInt16
             self.pa_format = pyaudio.paInt16  # Store for later use
             
-            self.model = vosk.Model(model_path)
+            # FIX: Convert WindowsPath to string
+            model_path_str = str(model_path)
+            self.model = vosk.Model(model_path_str)
             self.recognizer = vosk.KaldiRecognizer(self.model, self.RATE)
             self.recognizer.SetWords(True)
             self.mode = "vosk"
@@ -93,36 +97,35 @@ class STTManager:
             logging.warning("[STT] Falling back to text input")
             self.mode = "text_input"
             self.engine = NoSTT()
-    
-    def listen(self, timeout: int = 5) -> str:
-        """
-        Listen to user input (audio or text fallback)
-        
-        Args:
-            timeout: Maximum seconds to listen (Vosk mode)
+        def listen(self, timeout: int = 5) -> str:
+            """
+            Listen to user input (audio or text fallback)
             
-        Returns:
-            Transcribed text or empty string
-        """
-        
-        # TEXT INPUT FALLBACK MODE
-        if self.mode == "text_input":
-            logging.info("[STT] Text input mode - type your command:")
-            try:
-                text = input("You: ").strip()
-                if text:
-                    logging.info(f"[STT] Received: {text}")
-                return text
-            except (EOFError, KeyboardInterrupt):
-                return ""
-        
-        # VOSK AUDIO MODE
-        if self.mode == "vosk" and self.recognizer:
-            return self._listen_vosk(timeout)
-        
-        # NO STT AVAILABLE
-        logging.error("[STT] No speech recognition available")
-        return ""
+            Args:
+                timeout: Maximum seconds to listen (Vosk mode)
+                
+            Returns:
+                Transcribed text or empty string
+            """
+            
+            # TEXT INPUT FALLBACK MODE
+            if self.mode == "text_input":
+                logging.info("[STT] Text input mode - type your command:")
+                try:
+                    text = input("You: ").strip()
+                    if text:
+                        logging.info(f"[STT] Received: {text}")
+                    return text
+                except (EOFError, KeyboardInterrupt):
+                    return ""
+            
+            # VOSK AUDIO MODE
+            if self.mode == "vosk" and self.recognizer:
+                return self._listen_vosk(timeout)
+            
+            # NO STT AVAILABLE
+            logging.error("[STT] No speech recognition available")
+            return ""
     
     def _listen_vosk(self, timeout: int) -> str:
         """Listen using Vosk (original implementation)"""

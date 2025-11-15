@@ -73,7 +73,11 @@ class Sebas:
         # STT & TTS Managers
         # --------------------------------------------------
         self.stt = STTManager(language_manager=self.language_manager)
-        self.tts = TTSManager(language_manager=self.language_manager)
+        self.tts = TTSManager(
+            language_manager=self.language_manager,
+            piper_model_path="sebas/voices/piper/en_US-john-medium.onnx",
+            piper_config_path="sebas/voices/piper/en_US-john-medium.onnx.json"
+        )
 
         # Bind language manager to voice + recognition systems
         self.language_manager.bind_stt(self.stt)
@@ -226,7 +230,7 @@ def main():
     
     # Setup logging with UTF-8 encoding support
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,
         format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
         handlers=[
             logging.StreamHandler(sys.stdout),
@@ -261,6 +265,8 @@ def main():
 
         # Start SEBAS core
         assistant.start()
+        
+        time.sleep(0.5)
 
         logging.info("[SEBAS] Stage 1 is RUNNING")
         logging.info("[INFO] Open http://127.0.0.1:5000 in your browser")
