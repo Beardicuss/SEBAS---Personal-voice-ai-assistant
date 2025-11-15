@@ -63,11 +63,14 @@ class VoskWakeWord:
 
     def detect(self):
         """
-        Check if wake word is detected.
+        Check if any speech is detected and return it.
         
         Returns:
-            dict with 'detected' (bool) and 'text' (str) keys if wake word found,
+            dict with 'detected' (bool) and 'text' (str) keys if speech detected,
             False otherwise
+            
+        Note: This returns ALL recognized speech. The WakeWordDetector 
+        will check for wake word variations.
         """
         try:
             # Read audio data
@@ -92,18 +95,17 @@ class VoskWakeWord:
                 text = result.get("text", "").lower()
                 
                 if text:
+                    # Log what we recognized
                     logging.info(f"[VoskWakeWord] 🎤 RECOGNIZED: '{text}'")
                     
-                    # Check for wake word
-                    if self.keyword in text:
-                        if text != self.last_detection_text:
-                            logging.info(f"[VoskWakeWord] ✓ WAKE WORD DETECTED: '{text}'")
-                            self.last_detection_text = text
-                            self.silence_counter = 0
-                            # Return dict with detected flag and full text
-                            return {'detected': True, 'text': text}
-                        else:
-                            logging.debug("[VoskWakeWord] Duplicate detection, ignoring")
+                    # Return ALL recognized text - let WakeWordDetector check for variations
+                    if text != self.last_detection_text:
+                        self.last_detection_text = text
+                        self.silence_counter = 0
+                        # Always return dict with detected flag and full text
+                        return {'detected': True, 'text': text}
+                    else:
+                        logging.debug("[VoskWakeWord] Duplicate detection, ignoring")
                     
                     self.silence_counter = 0
             else:

@@ -1,5 +1,6 @@
 """
 Wake Word Detector - Stage 1 Mk.I with Audio Detection and Text Output
+Enhanced with wake word variations support
 """
 
 import logging
@@ -10,17 +11,18 @@ import time
 
 class WakeWordDetector:
     """
-    Wake word detector with audio support.
-    Listens for wake word, then triggers callback with recognized text.
+    Wake word detector with audio support and variation matching.
+    Listens for wake word (and its variations), then triggers callback with recognized text.
     """
     
-    def __init__(self, callback, keyword="check"): # აქ არი
+    def __init__(self, callback, keyword="sebas", variations=None):
         """
         Initialize wake word detector.
         
         Args:
             callback: Function to call when wake word detected
-            keyword: Wake word to listen for
+            keyword: Primary wake word to listen for
+            variations: List of acceptable variations (optional)
         """
         self.callback = callback
         self.keyword = keyword.lower()
@@ -29,6 +31,68 @@ class WakeWordDetector:
         self.detection_thread = None
         self.detector = None
         self.last_recognized_text = ""
+        
+        # Setup wake word variations
+        if variations is None:
+            # Default comprehensive variations for "sebas"
+            self.variations = [
+                # Direct variations
+                "sebas",
+                "sebus",
+                "sebass",
+                "sebbas",
+                
+                # Phonetic variations
+                "see bass",
+                "see bus",
+                "see boss",
+                "sea bass",
+                "sea bus",
+                "sea boss",
+                "c bass",
+                "c bus", 
+                "c boss",
+                
+                # "So" variations (common misrecognitions from logs)
+                "so bass",
+                "so bus",
+                "so boss",
+                "so bas",
+                
+                # Common misrecognitions
+                "cebas",
+                "cebus",
+                "seavas",
+                "sevas",
+                "sabres",
+                "sabers",
+                
+                # With spacing variations
+                "se bas",
+                "se bus",
+                "se boss",
+                
+                # Partial matches
+                "seba",
+                "sebba",
+                
+                # Other phonetic possibilities
+                "say bass",
+                "say bus",
+                "say boss",
+                "seabus",
+                "seabass",
+                "cbass",
+            ]
+        else:
+            self.variations = [v.lower() for v in variations]
+        
+        # Ensure primary keyword is in variations
+        if self.keyword not in self.variations:
+            self.variations.insert(0, self.keyword)
+        
+        logging.info(f"[WakeWord] Configured with {len(self.variations)} variations")
+        logging.debug(f"[WakeWord] Variations: {self.variations}")
                 
         # Try to initialize Vosk wake word detection
         try:
@@ -41,7 +105,7 @@ class WakeWordDetector:
             if self.detector is not None:
                 self.mode = "audio"
                 logging.info(f"[WakeWord] ✓ Successfully initialized in AUDIO mode (keyword: '{keyword}')")
-                logging.info("[WakeWord] Will listen for wake word via microphone")
+                logging.info(f"[WakeWord] Will listen for '{keyword}' and {len(self.variations)} variations")
             else:
                 logging.error("[WakeWord] Detector initialization returned None")
                 self.mode = "manual"
@@ -56,6 +120,24 @@ class WakeWordDetector:
             logging.info("[WakeWord] Falling back to MANUAL mode")
             self.mode = "manual"
             self.detector = None
+    
+    def _check_variations(self, text: str) -> tuple[bool, str]:
+        """
+        Check if any wake word variation is present in the text.
+        
+        Args:
+            text: Text to check
+            
+        Returns:
+            Tuple of (detected: bool, matched_variation: str)
+        """
+        text_lower = text.lower()
+        
+        for variation in self.variations:
+            if variation in text_lower:
+                return True, variation
+        
+        return False, ""
     
     def start(self):
         """Start wake word detection"""
@@ -78,7 +160,7 @@ class WakeWordDetector:
             )
             self.detection_thread.start()
             logging.info("[WakeWord] ✓ Audio detection started - listening for wake word...")
-            logging.info(f"[WakeWord] Speak '{self.keyword}' to activate")
+            logging.info(f"[WakeWord] Speak '{self.keyword}' (or variations) to activate")
         else:
             # Debug: Explain why we're in manual mode
             if self.mode != "audio":
@@ -106,17 +188,24 @@ class WakeWordDetector:
                     detected_text = result.get('text', '')
                     self.last_recognized_text = detected_text
                     
-                    logging.info(f"[WakeWord] ✓ '{self.keyword}' detected in: '{detected_text}'")
+                    # Check for variations in the detected text
+                    is_match, matched_variation = self._check_variations(detected_text)
                     
-                    # Trigger callback with the recognized text
-                    if self.callback:
-                        try:
-                            self.callback(detected_text)
-                        except Exception as e:
-                            logging.exception(f"[WakeWord] Callback error: {e}")
-                    
-                    # Small delay to avoid multiple triggers
-                    time.sleep(1)
+                    if is_match:
+                        logging.info(f"[WakeWord] ✓ Wake word detected! Matched '{matched_variation}' in: '{detected_text}'")
+                        
+                        # Trigger callback with the recognized text
+                        if self.callback:
+                            try:
+                                self.callback(detected_text)
+                            except Exception as e:
+                                logging.exception(f"[WakeWord] Callback error: {e}")
+                        
+                        # Small delay to avoid multiple triggers
+                        time.sleep(1)
+                    else:
+                        # Text was detected but no wake word variation matched
+                        logging.debug(f"[WakeWord] Detected text '{detected_text}' - no wake word match")
                 
                 elif result is True:
                     # Old format: just boolean (backward compatibility)
@@ -181,6 +270,7 @@ class WakeWordDetector:
             'mode': self.mode,
             'running': self.running,
             'keyword': self.keyword,
+            'variations_count': len(self.variations),
             'audio_available': self.mode == "audio",
             'detector_active': self.detection_thread and self.detection_thread.is_alive() if self.detection_thread else False,
             'last_recognized_text': self.last_recognized_text,
@@ -190,3 +280,37 @@ class WakeWordDetector:
     def get_last_recognized_text(self) -> str:
         """Get the last recognized text"""
         return self.last_recognized_text
+    
+    def get_variations(self) -> list:
+        """Get list of all wake word variations"""
+        return self.variations.copy()
+    
+    def add_variation(self, variation: str):
+        """
+        Add a new wake word variation.
+        
+        Args:
+            variation: New variation to add
+        """
+        variation_lower = variation.lower()
+        if variation_lower not in self.variations:
+            self.variations.append(variation_lower)
+            logging.info(f"[WakeWord] Added new variation: '{variation}'")
+        else:
+            logging.debug(f"[WakeWord] Variation '{variation}' already exists")
+    
+    def remove_variation(self, variation: str):
+        """
+        Remove a wake word variation.
+        
+        Args:
+            variation: Variation to remove
+        """
+        variation_lower = variation.lower()
+        if variation_lower in self.variations and variation_lower != self.keyword:
+            self.variations.remove(variation_lower)
+            logging.info(f"[WakeWord] Removed variation: '{variation}'")
+        elif variation_lower == self.keyword:
+            logging.warning(f"[WakeWord] Cannot remove primary keyword '{self.keyword}'")
+        else:
+            logging.debug(f"[WakeWord] Variation '{variation}' not found")
