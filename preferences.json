@@ -1,0 +1,15 @@
+{
+  "user_role": "ADMIN_OWNER",
+  "language": "en",
+  "auto_save": true,
+  "skills": {
+    "smart_home": {
+      "enabled": true,
+      "provider": "home_assistant"
+    },
+    "compliance": {
+      "enabled": true,
+      "audit_level": "detailed"
+    }
+  }
+}

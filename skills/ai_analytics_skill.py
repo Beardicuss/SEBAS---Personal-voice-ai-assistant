@@ -1,238 +1,409 @@
 # -*- coding: utf-8 -*-
 """
-AI Analytics Skill
-Phase 6.1: Predictive Analytics and Anomaly Detection
+AI Analytics Integration - Stage 2 Implementation
+Provides anomaly detection and predictive analytics without ML dependencies
 """
 
-from sebas.skills.base_skill import BaseSkill
-from typing import Dict, Any
+import psutil
 import logging
+from typing import Dict, List, Any, Optional
+from datetime import datetime, timedelta
+from collections import defaultdict, deque
 
 
-class AIAnalyticsSkill(BaseSkill):
+class AnomalyDetector:
     """
-    Skill for AI-powered analytics and predictions.
+    Detects system anomalies using statistical methods.
+    No ML dependencies required - uses heuristics and thresholds.
     """
     
-    def __init__(self, assistant):
-        super().__init__(assistant)
-        self.intents = [
-            'detect_anomalies',
-            'predict_disk_failure',
-            'predict_memory_leak',
-            'get_performance_suggestions',
-            'get_troubleshooting_guide',
-            'diagnose_issue'
-        ]
-        self.anomaly_detector = None
-        self.predictive_analyzer = None
-        self.performance_optimizer = None
-        self.troubleshooting_guide = None
-        self._init_analytics()
+    def __init__(self):
+        self.baseline_metrics: Dict[str, deque] = defaultdict(lambda: deque(maxlen=100))
+        self.thresholds = {
+            'cpu_critical': 90,
+            'cpu_high': 75,
+            'memory_critical': 90,
+            'memory_high': 80,
+            'disk_critical': 95,
+            'disk_high': 85,
+        }
     
-    def can_handle(self, intent: str) -> bool:
-        """Check if this skill can handle the intent."""
-        return intent in self.intents
-    
-    def get_intents(self) -> list:
-        """Get list of intents this skill can handle."""
-        return self.intents
-    
-    def _init_analytics(self):
-        """Initialize analytics components."""
+    def collect_metrics(self) -> Dict[str, Any]:
+        """Collect current system metrics."""
         try:
-            from sebas.integrations.ai_analytics import (
-                AnomalyDetector, PredictiveAnalyzer,
-                PerformanceOptimizer, TroubleshootingGuide
-            )
-            self.anomaly_detector = AnomalyDetector()
-            self.predictive_analyzer = PredictiveAnalyzer()
-            self.performance_optimizer = PerformanceOptimizer()
-            self.troubleshooting_guide = TroubleshootingGuide()
-        except Exception:
-            logging.exception("Failed to initialize AI analytics")
+            return {
+                'cpu_percent': psutil.cpu_percent(interval=1),
+                'memory_percent': psutil.virtual_memory().percent,
+                'disk_percent': psutil.disk_usage('/').percent,
+                'process_count': len(psutil.pids()),
+                'network_connections': len(psutil.net_connections()),
+                'timestamp': datetime.now().isoformat()
+            }
+        except Exception as e:
+            logging.error(f"Failed to collect metrics: {e}")
+            return {}
     
-    def handle(self, intent: str, slots: dict) -> bool:
-        if intent == 'detect_anomalies':
-            return self._handle_detect_anomalies()
-        elif intent == 'predict_disk_failure':
-            return self._handle_predict_disk_failure(slots)
-        elif intent == 'predict_memory_leak':
-            return self._handle_predict_memory_leak(slots)
-        elif intent == 'get_performance_suggestions':
-            return self._handle_get_performance_suggestions()
-        elif intent == 'get_troubleshooting_guide':
-            return self._handle_get_troubleshooting_guide(slots)
-        elif intent == 'diagnose_issue':
-            return self._handle_diagnose_issue(slots)
-        return False
+    def detect_anomalies(self, metrics: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Detect anomalies in system metrics."""
+        anomalies = []
+        
+        # Store metrics for baseline
+        for key, value in metrics.items():
+            if isinstance(value, (int, float)):
+                self.baseline_metrics[key].append(value)
+        
+        # CPU anomalies
+        cpu = metrics.get('cpu_percent', 0)
+        if cpu > self.thresholds['cpu_critical']:
+            anomalies.append({
+                'type': 'cpu',
+                'severity': 'critical',
+                'value': cpu,
+                'message': f'CPU usage critical: {cpu}%'
+            })
+        elif cpu > self.thresholds['cpu_high']:
+            anomalies.append({
+                'type': 'cpu',
+                'severity': 'high',
+                'value': cpu,
+                'message': f'CPU usage high: {cpu}%'
+            })
+        
+        # Memory anomalies
+        memory = metrics.get('memory_percent', 0)
+        if memory > self.thresholds['memory_critical']:
+            anomalies.append({
+                'type': 'memory',
+                'severity': 'critical',
+                'value': memory,
+                'message': f'Memory usage critical: {memory}%'
+            })
+        elif memory > self.thresholds['memory_high']:
+            anomalies.append({
+                'type': 'memory',
+                'severity': 'high',
+                'value': memory,
+                'message': f'Memory usage high: {memory}%'
+            })
+        
+        # Disk anomalies
+        disk = metrics.get('disk_percent', 0)
+        if disk > self.thresholds['disk_critical']:
+            anomalies.append({
+                'type': 'disk',
+                'severity': 'critical',
+                'value': disk,
+                'message': f'Disk space critical: {disk}%'
+            })
+        elif disk > self.thresholds['disk_high']:
+            anomalies.append({
+                'type': 'disk',
+                'severity': 'high',
+                'value': disk,
+                'message': f'Disk space high: {disk}%'
+            })
+        
+        # Process count anomaly (simple spike detection)
+        process_count = metrics.get('process_count', 0)
+        if len(self.baseline_metrics['process_count']) > 10:
+            avg_processes = sum(self.baseline_metrics['process_count']) / len(self.baseline_metrics['process_count'])
+            if process_count > avg_processes * 1.5:
+                anomalies.append({
+                    'type': 'processes',
+                    'severity': 'medium',
+                    'value': process_count,
+                    'message': f'Unusual process count: {process_count} (avg: {avg_processes:.0f})'
+                })
+        
+        return anomalies
+
+
+class PredictiveAnalyzer:
+    """
+    Provides predictive analytics for system resources.
+    Uses trend analysis and linear extrapolation.
+    """
     
-    def _handle_detect_anomalies(self) -> bool:
-        """Handle detect anomalies command."""
+    def __init__(self):
+        self.history: Dict[str, List[tuple]] = defaultdict(list)  # (timestamp, value)
+    
+    def predict_disk_space_failure(self, path: str = '/', days: int = 30) -> Optional[Dict[str, Any]]:
+        """Predict when disk space will run out."""
         try:
-            if not self.anomaly_detector:
-                self.assistant.speak("Anomaly detection not available")
-                return False
+            disk = psutil.disk_usage(path)
+            current_usage = disk.percent
             
-            # Collect metrics and detect anomalies
-            metrics = self.anomaly_detector.collect_metrics()
-            anomalies = self.anomaly_detector.detect_anomalies(metrics)
+            # Store current measurement
+            self.history['disk_usage'].append((datetime.now(), current_usage))
             
-            if anomalies:
-                critical = [a for a in anomalies if a.get('severity') == 'critical']
-                high = [a for a in anomalies if a.get('severity') == 'high']
-                
-                if critical:
-                    self.assistant.speak(f"Detected {len(critical)} critical anomalies and {len(high)} high severity anomalies")
-                else:
-                    self.assistant.speak(f"Detected {len(anomalies)} anomalies")
+            # Need at least 10 data points for prediction
+            if len(self.history['disk_usage']) < 10:
+                return None
+            
+            # Calculate trend (simple linear regression)
+            recent = self.history['disk_usage'][-30:]  # Last 30 measurements
+            if len(recent) < 2:
+                return None
+            
+            # Calculate average daily increase
+            time_diff = (recent[-1][0] - recent[0][0]).total_seconds() / 86400  # days
+            usage_diff = recent[-1][1] - recent[0][1]
+            
+            if time_diff == 0:
+                return None
+            
+            daily_increase = usage_diff / time_diff
+            
+            # Predict days until full (95% threshold)
+            space_remaining = 95 - current_usage
+            if daily_increase <= 0:
+                return None  # Usage is decreasing
+            
+            days_until_full = space_remaining / daily_increase
+            
+            # Determine risk level
+            if days_until_full < 7:
+                risk = 'critical'
+            elif days_until_full < 30:
+                risk = 'high'
+            elif days_until_full < 90:
+                risk = 'medium'
             else:
-                self.assistant.speak("No anomalies detected")
+                risk = 'low'
             
-            return True
+            return {
+                'predicted_failure_days': days_until_full,
+                'current_usage': current_usage,
+                'daily_increase': daily_increase,
+                'risk_level': risk
+            }
             
-        except Exception:
-            logging.exception("Failed to detect anomalies")
-            self.assistant.speak("Failed to detect anomalies")
-            return False
+        except Exception as e:
+            logging.error(f"Failed to predict disk failure: {e}")
+            return None
     
-    def _handle_predict_disk_failure(self, slots: dict) -> bool:
-        """Handle predict disk failure command."""
+    def predict_memory_leak(self, process_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Predict potential memory leaks in processes."""
         try:
-            if not self.predictive_analyzer:
-                self.assistant.speak("Predictive analysis not available")
-                return False
-            
-            path = slots.get('path', 'C:\\')
-            days = int(slots.get('days', 30))
-            
-            prediction = self.predictive_analyzer.predict_disk_space_failure(path, days)
-            
-            if prediction:
-                days_until = prediction.get('predicted_failure_days', 0)
-                risk = prediction.get('risk_level', 'unknown')
-                self.assistant.speak(
-                    f"Disk space prediction: {days_until:.0f} days until full. Risk level: {risk}"
-                )
+            # Get all processes or specific process
+            if process_name:
+                processes = [p for p in psutil.process_iter(['name', 'memory_info']) 
+                           if p.info['name'] == process_name]
             else:
-                self.assistant.speak("No disk space issues predicted in the near future")
+                processes = list(psutil.process_iter(['name', 'memory_info']))[:10]  # Top 10
             
-            return True
+            leaky_processes = []
             
-        except Exception:
-            logging.exception("Failed to predict disk failure")
-            self.assistant.speak("Failed to predict disk failure")
-            return False
+            for proc in processes:
+                try:
+                    proc_name = proc.info['name']
+                    memory = proc.info['memory_info'].rss / 1024 / 1024  # MB
+                    
+                    # Store measurement
+                    key = f'proc_{proc.pid}'
+                    self.history[key].append((datetime.now(), memory))
+                    
+                    # Need at least 5 measurements
+                    if len(self.history[key]) < 5:
+                        continue
+                    
+                    # Check for consistent growth
+                    recent = self.history[key][-10:]
+                    if len(recent) < 2:
+                        continue
+                    
+                    # Calculate growth rate
+                    growth = recent[-1][1] - recent[0][1]
+                    time_diff = (recent[-1][0] - recent[0][0]).total_seconds() / 60  # minutes
+                    
+                    if time_diff == 0:
+                        continue
+                    
+                    growth_rate = growth / time_diff  # MB per minute
+                    
+                    # Detect leak (growing > 1MB/min consistently)
+                    if growth_rate > 1.0:
+                        leaky_processes.append({
+                            'name': proc_name,
+                            'pid': proc.pid,
+                            'memory_mb': memory,
+                            'growth_rate': growth_rate
+                        })
+                        
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+            
+            if leaky_processes:
+                # Return most leaky process
+                top_leak = max(leaky_processes, key=lambda x: x['growth_rate'])
+                return {
+                    'risk_level': 'high' if top_leak['growth_rate'] > 5 else 'medium',
+                    'process': top_leak,
+                    'recommendation': f"Monitor {top_leak['name']} - growing {top_leak['growth_rate']:.1f}MB/min"
+                }
+            
+            return None
+            
+        except Exception as e:
+            logging.error(f"Failed to predict memory leak: {e}")
+            return None
+
+
+class PerformanceOptimizer:
+    """
+    Analyzes system performance and provides optimization suggestions.
+    """
     
-    def _handle_predict_memory_leak(self, slots: dict) -> bool:
-        """Handle predict memory leak command."""
+    def analyze_performance(self) -> List[Dict[str, Any]]:
+        """Analyze system and provide performance suggestions."""
+        suggestions = []
+        
         try:
-            if not self.predictive_analyzer:
-                self.assistant.speak("Predictive analysis not available")
-                return False
+            # CPU analysis
+            cpu_percent = psutil.cpu_percent(interval=1, percpu=False)
+            if cpu_percent > 80:
+                suggestions.append({
+                    'category': 'cpu',
+                    'severity': 'high',
+                    'suggestion': 'CPU usage is high. Consider closing unnecessary applications.',
+                    'metric': cpu_percent
+                })
             
-            process_name = slots.get('process_name')
-            prediction = self.predictive_analyzer.predict_memory_leak(process_name)
+            # Memory analysis
+            memory = psutil.virtual_memory()
+            if memory.percent > 85:
+                suggestions.append({
+                    'category': 'memory',
+                    'severity': 'high',
+                    'suggestion': 'Memory usage is high. Consider closing memory-intensive applications.',
+                    'metric': memory.percent
+                })
             
-            if prediction:
-                risk = prediction.get('risk_level', 'unknown')
-                recommendation = prediction.get('recommendation', '')
-                self.assistant.speak(f"Memory leak prediction: Risk level {risk}. {recommendation}")
-            else:
-                self.assistant.speak("No memory leak issues detected")
+            # Disk analysis
+            disk = psutil.disk_usage('/')
+            if disk.percent > 90:
+                suggestions.append({
+                    'category': 'disk',
+                    'severity': 'critical',
+                    'suggestion': 'Disk space is critically low. Run disk cleanup or remove unnecessary files.',
+                    'metric': disk.percent
+                })
+            elif disk.percent > 80:
+                suggestions.append({
+                    'category': 'disk',
+                    'severity': 'medium',
+                    'suggestion': 'Disk space is running low. Consider cleaning up temporary files.',
+                    'metric': disk.percent
+                })
             
-            return True
+            # Process count
+            process_count = len(psutil.pids())
+            if process_count > 200:
+                suggestions.append({
+                    'category': 'processes',
+                    'severity': 'medium',
+                    'suggestion': f'High number of processes running ({process_count}). Consider closing unused applications.',
+                    'metric': process_count
+                })
             
-        except Exception:
-            logging.exception("Failed to predict memory leak")
-            self.assistant.speak("Failed to predict memory leak")
-            return False
+            # Network connections
+            try:
+                connections = len(psutil.net_connections())
+                if connections > 500:
+                    suggestions.append({
+                        'category': 'network',
+                        'severity': 'medium',
+                        'suggestion': f'High number of network connections ({connections}). Check for unnecessary network activity.',
+                        'metric': connections
+                    })
+            except psutil.AccessDenied:
+                pass  # Need elevated privileges
+            
+        except Exception as e:
+            logging.error(f"Failed to analyze performance: {e}")
+        
+        return suggestions
+
+
+class TroubleshootingGuide:
+    """
+    Provides troubleshooting guides and diagnostic advice.
+    """
     
-    def _handle_get_performance_suggestions(self) -> bool:
-        """Handle get performance suggestions command."""
-        try:
-            if not self.performance_optimizer:
-                self.assistant.speak("Performance optimizer not available")
-                return False
-            
-            suggestions = self.performance_optimizer.analyze_performance()
-            
-            if suggestions:
-                critical = [s for s in suggestions if s.get('severity') == 'critical']
-                high = [s for s in suggestions if s.get('severity') == 'high']
-                
-                if critical:
-                    self.assistant.speak(
-                        f"Found {len(critical)} critical and {len(high)} high priority performance issues. "
-                        f"Top suggestion: {critical[0].get('suggestion', '')}"
-                    )
-                else:
-                    self.assistant.speak(f"Found {len(suggestions)} performance suggestions")
-            else:
-                self.assistant.speak("No performance issues detected")
-            
-            return True
-            
-        except Exception:
-            logging.exception("Failed to get performance suggestions")
-            self.assistant.speak("Failed to get performance suggestions")
-            return False
+    def __init__(self):
+        self.guides = {
+            'high_cpu': {
+                'symptoms': ['high cpu', 'slow performance', 'fan noise'],
+                'solutions': [
+                    'Open Task Manager to identify CPU-intensive processes',
+                    'Close unnecessary applications',
+                    'Check for malware or unwanted software',
+                    'Update device drivers',
+                    'Reduce startup programs'
+                ]
+            },
+            'high_memory': {
+                'symptoms': ['high memory', 'system slowdown', 'out of memory'],
+                'solutions': [
+                    'Close unused browser tabs',
+                    'Restart memory-intensive applications',
+                    'Increase virtual memory/page file size',
+                    'Add more RAM if consistently high',
+                    'Check for memory leaks in applications'
+                ]
+            },
+            'disk_full': {
+                'symptoms': ['disk full', 'low disk space', 'storage warning'],
+                'solutions': [
+                    'Run Disk Cleanup utility',
+                    'Delete temporary files',
+                    'Uninstall unused applications',
+                    'Move large files to external storage',
+                    'Empty Recycle Bin'
+                ]
+            },
+            'network_slow': {
+                'symptoms': ['slow internet', 'network issues', 'connection problems'],
+                'solutions': [
+                    'Restart router/modem',
+                    'Check network cable connections',
+                    'Run network troubleshooter',
+                    'Update network drivers',
+                    'Check for bandwidth-heavy applications'
+                ]
+            }
+        }
     
-    def _handle_get_troubleshooting_guide(self, slots: dict) -> bool:
-        """Handle get troubleshooting guide command."""
-        try:
-            if not self.troubleshooting_guide:
-                self.assistant.speak("Troubleshooting guide not available")
-                return False
-            
-            issue_type = slots.get('issue_type', '')
-            guide = self.troubleshooting_guide.get_troubleshooting_guide(issue_type)
-            
-            if guide:
-                solutions = guide.get('solutions', [])
-                if solutions:
-                    self.assistant.speak(f"Troubleshooting guide for {issue_type}. First solution: {solutions[0]}")
-                else:
-                    self.assistant.speak(f"Found troubleshooting guide for {issue_type}")
-            else:
-                self.assistant.speak(f"No troubleshooting guide found for {issue_type}")
-            
-            return guide is not None
-            
-        except Exception:
-            logging.exception("Failed to get troubleshooting guide")
-            self.assistant.speak("Failed to get troubleshooting guide")
-            return False
+    def get_troubleshooting_guide(self, issue_type: str) -> Optional[Dict[str, Any]]:
+        """Get troubleshooting guide for an issue."""
+        return self.guides.get(issue_type)
     
-    def _handle_diagnose_issue(self, slots: dict) -> bool:
-        """Handle diagnose issue command."""
-        try:
-            if not self.troubleshooting_guide:
-                self.assistant.speak("Diagnostic system not available")
-                return False
+    def diagnose_issue(self, symptoms: List[str]) -> List[Dict[str, Any]]:
+        """Diagnose issue based on symptoms."""
+        matches = []
+        
+        for issue_type, guide in self.guides.items():
+            # Calculate match score
+            symptom_matches = sum(1 for symptom in symptoms 
+                                if any(s in symptom.lower() for s in guide['symptoms']))
             
-            symptoms_str = slots.get('symptoms', '')
-            symptoms = [s.strip() for s in symptoms_str.split(',')] if symptoms_str else []
-            
-            if not symptoms:
-                self.assistant.speak("Please specify symptoms to diagnose")
-                return False
-            
-            matches = self.troubleshooting_guide.diagnose_issue(symptoms)
-            
-            if matches:
-                top_match = matches[0]
-                issue_type = top_match.get('issue_type', 'unknown')
-                confidence = top_match.get('confidence', 0)
-                self.assistant.speak(
-                    f"Diagnosis: {issue_type} with {confidence*100:.0f}% confidence"
-                )
-            else:
-                self.assistant.speak("Could not diagnose issue from provided symptoms")
-            
-            return len(matches) > 0
-            
-        except Exception:
-            logging.exception("Failed to diagnose issue")
-            self.assistant.speak("Failed to diagnose issue")
-            return False
+            if symptom_matches > 0:
+                confidence = symptom_matches / len(guide['symptoms'])
+                matches.append({
+                    'issue_type': issue_type,
+                    'confidence': confidence,
+                    'solutions': guide['solutions']
+                })
+        
+        # Sort by confidence
+        matches.sort(key=lambda x: x['confidence'], reverse=True)
+        return matches
+
+
+# Backward compatibility
+__all__ = [
+    'AnomalyDetector',
+    'PredictiveAnalyzer', 
+    'PerformanceOptimizer',
+    'TroubleshootingGuide'
+]

@@ -1,19 +1,19 @@
 ============================================================
 SEBAS DIAGNOSTICS SUITE Mk.V — COMPREHENSIVE ANALYSIS
 ============================================================
-Generated: 2025-11-16 20:32:56
+Generated: 2025-11-16 22:51:28
 
 ============================================================
 EXECUTIVE SUMMARY
 ============================================================
-Total Files Analyzed: 107
-Total Lines of Code: 14,941
-Total Functions: 649
+Total Files Analyzed: 109
+Total Lines of Code: 14,967
+Total Functions: 654
 Total Classes: 96
 Unused Modules: 44
 Circular Imports: 2
 Dangerous Calls: 9
-Missing __init__.py: 2
+Missing __init__.py: 0
 External Dependencies: 49
 
 ============================================================
@@ -84,8 +84,8 @@ Cycle #2:
 ⚠ Found 9 potentially dangerous call(s):
 
   skills\app_skill.py:
-    • subprocess.Popen
     • subprocess.call
+    • subprocess.Popen
 
   skills\security_skill.py:
     • subprocess.call
@@ -100,10 +100,7 @@ Cycle #2:
 ============================================================
 4. MISSING __init__.py FILES
 ============================================================
-⚠ Found 2 director(y/ies) missing __init__.py:
-
-  • wrappers
-  • tts\future
+✓ All Python packages have __init__.py files.
 
 ============================================================
 5. CODE QUALITY ANALYSIS
@@ -120,7 +117,6 @@ Cycle #2:
   • create_swagger_spec() in api\swagger.py: 233 lines
   • _parse_natural_event() in skills\automation_skill.py: 151 lines
   • __init__() in integrations\nlu_enhancer.py: 126 lines
-  • __init__() in services\nlu.py: 115 lines
   • __init__() in wakeword\wakeword_detector.py: 104 lines
 
 ⚠ God objects (>20 methods):
@@ -191,7 +187,6 @@ Found 49 external package(s):
 • Consider removing unused modules to reduce complexity
 • Refactor circular imports to improve modularity
 • Review dangerous calls (eval, exec) for security risks
-• Add __init__.py files to all package directories
 • Split large files (>500 lines) into smaller modules
 • Refactor god objects (>20 methods) into smaller classes
 
