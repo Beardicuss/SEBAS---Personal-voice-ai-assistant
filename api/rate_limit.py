@@ -5,7 +5,7 @@ Rate Limiting Framework
 
 import time
 import logging
-from sebas.typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional
 from sebas.collections import defaultdict
 from sebas.functools import wraps
 from sebas.flask import request, jsonify, g

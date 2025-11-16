@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 MonitoringSkill
 
@@ -10,7 +9,7 @@ import os
 import psutil
 import logging
 import time
-from sebas.typing import Optional
+from typing import Optional
 from .base_skill import BaseSkill
 
 class MonitoringSkill(BaseSkill):
@@ -30,7 +29,14 @@ class MonitoringSkill(BaseSkill):
             'analyze_startup_impact',
             'disable_startup_item'
         ]
-        self.disk_space_threshold = self.assistant.prefs.get_pref('disk_space_threshold_percent', 85.0)
+        
+        # FIX: Check if assistant has prefs attribute
+        if hasattr(assistant, 'prefs'):
+            self.disk_space_threshold = assistant.prefs.get_pref('disk_space_threshold_percent', 85.0)
+        else:
+            # Default value if prefs not available
+            self.disk_space_threshold = 85.0
+            
         # Cache for startup items
         self.startup_items_cache = []
 

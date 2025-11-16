@@ -8,7 +8,7 @@ import logging
 import os
 import requests
 from sebas.datetime import datetime, timedelta
-from sebas.typing import Optional, Tuple, List, Dict, Any
+from typing import Optional, Tuple, List, Dict, Any
 
 
 class CalendarClient:

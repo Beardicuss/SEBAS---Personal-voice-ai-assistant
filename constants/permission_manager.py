@@ -5,7 +5,7 @@ Compatible with intent-based permissions.
 """
 
 import enum
-from sebas.typing import Dict
+from typing import Dict
 
 
 # ---------------------------------------------------

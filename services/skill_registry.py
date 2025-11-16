@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Skill Registry - Stage 1 Mk.I FIXED
-Properly passes assistant reference to skills
+Skill Registry - Stage 2 Mk.II ENHANCED
+Updated to load all Stage 1 + Stage 2 skills
 """
 
 import os
@@ -11,11 +11,10 @@ from typing import List, Dict, Any, Optional
 from sebas.skills.base_skill import BaseSkill
 import logging
 
-
 class SkillRegistry:
     """Manages the loading, registration, and execution of skills."""
 
-    def __init__(self, assistant_ref, skills_dir: str = None):
+    def __init__(self, assistant_ref, skills_dir: Optional[str] = None):
         """
         Initialize the skill registry.
 
@@ -41,20 +40,35 @@ class SkillRegistry:
             self.logger.error(f"Skills directory not found at: {self.skills_dir}")
             return
 
-        # Stage 1: load essential skills
+        # Stage 1: Essential skills
         stage1_skills = [
             'sebas.skills.system_skill',
             'sebas.skills.app_skill',
             'sebas.skills.network_skill',
+            'sebas.skills.datetime_skill',
         ]
 
-        for module_name in stage1_skills:
+        # Stage 2: Extended skills
+        stage2_skills = [
+            'sebas.skills.volume_skill',
+            'sebas.skills.storage_skill',
+            'sebas.skills.monitoring_skill',
+            'sebas.skills.file_skill',
+            'sebas.skills.smart_home_skill',      # NEW - Stage 2
+            'sebas.skills.ai_analytics_skill',    # NEW - Stage 2
+            'sebas.skills.compliance_skill',      # NEW - Stage 2
+        ]
+
+        # Load all skills
+        all_skills = stage1_skills + stage2_skills
+        
+        for module_name in all_skills:
             try:
                 self._load_skill_module(module_name)
             except Exception as e:
-                self.logger.error(f"Failed to load skill {module_name}: {e}")
+                self.logger.warning(f"Skipping skill {module_name}: {e}")
 
-        self.logger.info(f"Loaded {len(self.skills)} skills for Stage 1")
+        self.logger.info(f"✓ Loaded {len(self.skills)} skills")
 
     def _load_skill_module(self, module_name: str):
         """Load a skill module and instantiate its class."""
@@ -77,10 +91,10 @@ class SkillRegistry:
 
             skill_instance = skill_class(self.assistant)
             self.skills.append(skill_instance)
-            self.logger.info(f" Loaded skill: {skill_class.__name__}")
+            self.logger.info(f"  ✓ Loaded: {skill_class.__name__}")
 
         except Exception as e:
-            self.logger.error(f"✗ Error loading skill {module_name}: {e}")
+            self.logger.warning(f"  ✗ Failed: {module_name} - {e}")
             raise
 
     def get_skill_for_intent(self, intent: str) -> Optional[BaseSkill]:
@@ -99,13 +113,17 @@ class SkillRegistry:
         if skill:
             try:
                 # Check if skill.handle accepts 3 arguments (old style)
-                import inspect
                 sig = inspect.signature(skill.handle)
                 params = list(sig.parameters.keys())
                 
-                if len(params) == 3:  # (intent, slots, sebas)
-                    return skill.handle(intent, slots, self.assistant)
-                else:  # (intent, slots)
+                # Check parameter count (excluding 'self')
+                param_count = len(params)
+                
+                if param_count >= 3:  # Has intent, slots, and possibly sebas/assistant
+                    # Old style: handle(self, intent, slots, sebas)
+                    return skill.handle(intent, slots, self.assistant) # type: ignore
+                else:
+                    # New style: handle(self, intent, slots)
                     return skill.handle(intent, slots)
                     
             except Exception:

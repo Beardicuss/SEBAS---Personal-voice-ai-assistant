@@ -8,7 +8,7 @@ import subprocess
 import platform
 import shlex
 import ctypes
-from sebas.typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict, List, Tuple
 from sebas.enum import Enum
 
 

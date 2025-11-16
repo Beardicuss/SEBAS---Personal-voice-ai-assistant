@@ -7,7 +7,7 @@ This provides dummy implementations so the assistant can run without backend int
 
 import os
 import logging
-from sebas.typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List
 
 
 class ComplianceManager:

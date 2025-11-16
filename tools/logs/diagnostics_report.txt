@@ -1,115 +1,200 @@
-===== SEBAS DIAGNOSTICS SUITE Mk.IV OMEGA =====
-Generated: 2025-11-14T21:53:34.822943
+============================================================
+SEBAS DIAGNOSTICS SUITE Mk.V — COMPREHENSIVE ANALYSIS
+============================================================
+Generated: 2025-11-16 20:32:56
 
-=== 1. UNUSED MODULES ===
- • ad_client
- • ad_skill
- • ai_analytics
- • ai_analytics_skill
- • api_server
- • app_skill
- • auth
- • automation_engine
- • automation_skill
- • calendar_client
- • cloud_sync
- • code_skill
- • compliance_manager
- • compliance_skill
- • datetime_skill
- • email_client
- • enterprise_integrations
- • event_bus
- • file_operations
- • file_skill
- • firewall_manager
- • language_manager
- • languages
- • logging_dashboard
- • monitoring_skill
- • ms_graph_auth
- • network_manager
- • network_skill
- • news_weather
- • nlu
- • nlu_enhancer
- • nlu_skill
- • permission_manager
- • port_monitor
- • preferences
- • process_manager
- • rate_limit
- • script_executor
- • security_manager
- • security_skill
- • service_skill
- • simple_wakeword
- • skill_registry
- • smart_home
- • smart_home_skill
- • storage_manager
- • storage_skill
- • stt_manager
- • stt_none
- • stt_vosk
- • suggestions
- • swagger
- • system_monitor
- • system_skill
- • task_manager
- • task_scheduler
- • tts_manager
- • tts_piper_real
- • tts_system
- • ui_server
- • versioning
- • voice_system
- • volume_skill
- • vpn_manager
- • wakeword_detector
- • wakeword_dummy
- • wakeword_porcupine
- • wakeword_vosk
- • webhooks
- • windows_service_manager
+============================================================
+EXECUTIVE SUMMARY
+============================================================
+Total Files Analyzed: 107
+Total Lines of Code: 14,941
+Total Functions: 649
+Total Classes: 96
+Unused Modules: 44
+Circular Imports: 2
+Dangerous Calls: 9
+Missing __init__.py: 2
+External Dependencies: 49
 
-=== 2. CIRCULAR IMPORTS ===
-No circular imports.
+============================================================
+1. UNUSED MODULES
+============================================================
+Found 44 potentially unused modules:
 
-=== 3. DANGEROUS CALLS ===
- • D:\SEBAS - Personal voice ai assistant\sebas\main.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\api\api_server.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\api\swagger.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\api\webhooks.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\constants\permissions.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\integrations\automation_engine.py uses eval
- • D:\SEBAS - Personal voice ai assistant\sebas\integrations\automation_engine.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\integrations\calendar_client.py uses eval
- • D:\SEBAS - Personal voice ai assistant\sebas\integrations\firewall_manager.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\integrations\network_manager.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\integrations\script_executor.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\services\skill_registry.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\app_skill.py uses subprocess.Popen
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\automation_skill.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\base_skill.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\code_skill.py uses eval
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\code_skill.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\file_skill.py uses exec
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\nlu_skill.py uses exec
+  • ad_client
+  • ad_skill
+  • ai_analytics_skill
+  • app_skill
+  • automation_skill
+  • code_skill
+  • compliance_manager
+  • compliance_skill
+  • datetime_skill
+  • file_skill
+  • languages
+  • logging_dashboard
+  • monitoring_skill
+  • network_manager
+  • network_skill
+  • news_weather
+  • nlu_skill
+  • port_monitor
+  • preferences
+  • process_manager
+  • pydantic_wrapper
+  • rate_limit
+  • security_manager
+  • security_skill
+  • service_skill
+  • smart_home
+  • smart_home_skill
+  • storage_manager
+  • storage_skill
+  • stt_vosk
+  • suggestions
+  • swagger
+  • system_monitor
+  • system_skill
+  • task_manager
+  • tts_piper_real
+  • versioning
+  • voice_typing
+  • volume_skill
+  • vpn_manager
+  • wakeword_dummy
+  • wakeword_porcupine
+  • webhooks
+  • windows_service_manager
 
-=== 4. MISSING __init__.py ===
- • D:\SEBAS - Personal voice ai assistant\sebas\events
- • D:\SEBAS - Personal voice ai assistant\sebas\services\legacy
+============================================================
+2. CIRCULAR IMPORT DEPENDENCIES
+============================================================
+⚠ Found 2 circular dependency chain(s):
 
-=== 5. FUNCTION SPEED (Mk.II) ===
-No slow functions detected.
+Cycle #1:
+  dataclasses → dataclasses
 
-=== 6. MINI AI ARCHITECTURE REVIEW (Mk.III) ===
- • D:\SEBAS - Personal voice ai assistant\sebas\integrations\automation_engine.py: God-object detected: class AutomationEngine has 16 methods.
- • D:\SEBAS - Personal voice ai assistant\sebas\integrations\smart_home.py: God-object detected: class HomeAssistantClient has 17 methods.
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\automation_skill.py: File extremely large (>800 lines). Consider refactoring.
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\automation_skill.py: God-object detected: class AutomationSkill has 30 methods.
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\code_skill.py: God-object detected: class CodeSkill has 27 methods.
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\file_skill.py: File extremely large (>800 lines). Consider refactoring.
- • D:\SEBAS - Personal voice ai assistant\sebas\skills\file_skill.py: God-object detected: class FileSkill has 43 methods.
+Cycle #2:
+  flask → flask
 
+
+============================================================
+3. POTENTIALLY DANGEROUS CALLS
+============================================================
+⚠ Found 9 potentially dangerous call(s):
+
+  skills\app_skill.py:
+    • subprocess.Popen
+    • subprocess.call
+
+  skills\security_skill.py:
+    • subprocess.call
+
+  skills\service_skill.py:
+    • subprocess.call
+
+  skills\system_skill.py:
+    • subprocess.call
+
+
+============================================================
+4. MISSING __init__.py FILES
+============================================================
+⚠ Found 2 director(y/ies) missing __init__.py:
+
+  • wrappers
+  • tts\future
+
+============================================================
+5. CODE QUALITY ANALYSIS
+============================================================
+⚠ Large files (>500 lines):
+
+  • skills\file_skill.py: 1163 lines
+  • skills\automation_skill.py: 876 lines
+  • skills\code_skill.py: 695 lines
+  • skills\compliance_skill.py: 504 lines
+
+⚠ Complex functions (>100 lines):
+
+  • create_swagger_spec() in api\swagger.py: 233 lines
+  • _parse_natural_event() in skills\automation_skill.py: 151 lines
+  • __init__() in integrations\nlu_enhancer.py: 126 lines
+  • __init__() in services\nlu.py: 115 lines
+  • __init__() in wakeword\wakeword_detector.py: 104 lines
+
+⚠ God objects (>20 methods):
+
+  • class FileSkill in skills\file_skill.py: 43 methods
+  • class AutomationSkill in skills\automation_skill.py: 30 methods
+  • class CodeSkill in skills\code_skill.py: 27 methods
+  • class PiperTTS in tts\piper_tts.py: 21 methods
+
+============================================================
+6. EXTERNAL DEPENDENCIES
+============================================================
+Found 49 external package(s):
+
+  • ast
+  • base64
+  • base_skill
+  • comtypes
+  • constants
+  • csv
+  • ctypes
+  • email
+  • events
+  • flask
+  • flask_cors
+  • fnmatch
+  • hashlib
+  • hmac
+  • imaplib
+  • importlib
+  • inspect
+  • io
+  • jwt
+  • mimetypes
+  • numpy
+  • onnxruntime
+  • piper
+  • piper_tts
+  • psutil
+  • pvporcupine
+  • pyaudio
+  • pycaw
+  • queue
+  • requests
+  • secrets
+  • shlex
+  • smtplib
+  • sounddevice
+  • speedtest
+  • string
+  • struct
+  • traceback
+  • uuid
+  • vosk
+  • wakeword_vosk
+  • wave
+  • webbrowser
+  • websocket
+  • win32api
+  • win32con
+  • win32security
+  • winreg
+  • zipfile
+
+============================================================
+7. RECOMMENDATIONS
+============================================================
+• Consider removing unused modules to reduce complexity
+• Refactor circular imports to improve modularity
+• Review dangerous calls (eval, exec) for security risks
+• Add __init__.py files to all package directories
+• Split large files (>500 lines) into smaller modules
+• Refactor god objects (>20 methods) into smaller classes
+
+============================================================
+END OF REPORT
+============================================================

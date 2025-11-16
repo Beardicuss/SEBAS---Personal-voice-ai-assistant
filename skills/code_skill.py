@@ -4,7 +4,7 @@ Code Skill - Voice-to-code functionality with code generation, editing, and vali
 """
 
 from sebas.skills.base_skill import BaseSkill
-from sebas.typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple
 import os
 import ast
 import re

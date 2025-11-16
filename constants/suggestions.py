@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from sebas.typing import List, Dict
+from typing import List, Dict
 from sebas.datetime import datetime
 
 

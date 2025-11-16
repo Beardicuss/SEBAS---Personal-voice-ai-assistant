@@ -24,7 +24,7 @@ class VolumeSkill(BaseSkill):
 
         vol = slots.get("level")
         try:
-            vol = int(vol)
+            vol = int(vol) if vol else 0
         except:
             sebas.speak("Sir, the volume must be a number.")
             return True
@@ -41,6 +41,11 @@ class VolumeSkill(BaseSkill):
             from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 
             devices = AudioUtilities.GetSpeakers()
+            
+            # Type guard for Pylance
+            if devices is None:
+                raise RuntimeError("No audio device found")
+            
             interface = devices.Activate(
                 IAudioEndpointVolume._iid_, CLSCTX_ALL, None
             )

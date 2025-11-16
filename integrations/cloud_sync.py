@@ -22,7 +22,7 @@ import os
 import io
 import zipfile
 from sebas.pathlib import Path
-from sebas.typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict
 
 
 class BaseCloudClient:

@@ -9,7 +9,7 @@ import psutil
 import socket
 import threading
 import time
-from sebas.typing import Dict, List, Optional, Set, Tuple, Callable
+from typing import Dict, List, Optional, Set, Tuple, Callable
 from sebas.datetime import datetime
 from sebas.enum import Enum
 

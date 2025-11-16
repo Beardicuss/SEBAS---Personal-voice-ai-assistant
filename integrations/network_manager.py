@@ -9,7 +9,7 @@ import subprocess
 import platform
 import socket
 import shlex
-from sebas.typing import Optional, Dict, List, Tuple, Any
+from typing import Optional, Dict, List, Tuple, Any
 from sebas.enum import Enum
 
 

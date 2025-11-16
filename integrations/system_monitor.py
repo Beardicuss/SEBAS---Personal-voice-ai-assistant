@@ -8,7 +8,7 @@ import platform
 import time
 import logging
 from sebas.datetime import datetime
-from sebas.typing import Dict, Any, Optional, cast
+from typing import Dict, Any, Optional, cast
 
 # Safe alias for temperature sensors to silence Pylance type error
 sensors_temperatures = cast(Any, getattr(psutil, "sensors_temperatures", lambda: {}))

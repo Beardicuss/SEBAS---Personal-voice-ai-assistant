@@ -1,6 +1,6 @@
 """
-Natural Language Understanding - Stage 1 Mk.I
-Enhanced pattern matching with fuzzy support.
+Enhanced NLU - Stage 2 Mk.II
+Added missing intents for failing skills
 """
 
 import re
@@ -22,13 +22,13 @@ class IntentWithConfidence(IntentBase):
 
 class SimpleNLU:
     """
-    Rule-based Natural Language Understanding.
-    Supports pattern matching and keyword detection.
+    Enhanced Rule-based NLU with Stage 2 intents.
     """
     
     def __init__(self):
         # Pattern-based intents (regex patterns)
         self.patterns: List[Tuple[str, str, float]] = [
+            # ========== STAGE 1 CORE ==========
             # System commands
             (r"shutdown|shut down|turn off( computer| pc)?", "shutdown_computer", 1.0),
             (r"restart|reboot( computer| pc)?", "restart_computer", 1.0),
@@ -68,9 +68,59 @@ class SimpleNLU:
             (r"delete (.+)", "delete_path", 0.9),
             (r"search( for)? (.+)", "search_files", 0.85),
             (r"find (.+)", "search_files", 0.85),
+            
+            # ========== STAGE 2 CORE FIXES ==========
+            
+            # ServiceSkill - FIXED
+            (r"list (all )?services", "list_services", 0.95),
+            (r"show (all )?services", "list_services", 0.9),
+            (r"get (all )?services", "list_services", 0.9),
+            (r"(start|stop|restart) service (.+)", "control_service", 0.95),
+            (r"get service status (.+)", "get_service_status", 0.95),
+            
+            # MonitoringSkill - FIXED
+            (r"(get |show )?system performance", "get_system_performance", 0.95),
+            (r"(get |show )?network stats", "get_network_stats", 0.95),
+            (r"(get |show )?disk io", "get_disk_io", 0.9),
+            (r"check (for )?memory leak", "check_memory_leaks", 0.95),
+            (r"analyze startup", "analyze_startup_impact", 0.95),
+            
+            # FileSkill - FIXED
+            (r"list recent files", "list_recent_files", 0.95),
+            (r"show recent files", "list_recent_files", 0.9),
+            (r"open recent( file)?( \d+)?", "open_recent_file", 0.95),
+            (r"(create|make) folder (.+)", "create_folder", 0.95),
+            
+            # AutomationSkill - FIXED
+            (r"list workflows", "list_workflows", 0.95),
+            (r"show workflows", "list_workflows", 0.9),
+            (r"(execute|run) workflow (.+)", "execute_workflow", 0.95),
+            (r"create workflow (.+)", "create_workflow", 0.95),
+            (r"set reminder (.+)", "set_reminder", 0.95),
+            
+            # ComplianceSkill - FIXED
+            (r"(get |show )?activity log", "get_activity_log", 0.95),
+            (r"(get |show )?audit (log|events)", "get_audit_events", 0.95),
+            (r"generate compliance report", "generate_compliance_report", 0.95),
+            
+            # ========== STAGE 2 NEW SKILLS ==========
+            
+            # SmartHomeSkill
+            (r"turn (on|off) (.+)", "smarthome_toggle", 0.9),
+            (r"(set|adjust) thermostat", "set_thermostat", 0.95),
+            (r"(lock|unlock) (door|doors)", "control_locks", 0.95),
+            
+            # AIAnalyticsSkill  
+            (r"detect anomalies", "detect_anomalies", 0.95),
+            (r"predict disk failure", "predict_disk_failure", 0.95),
+            (r"(get |show )?performance suggestions", "get_performance_suggestions", 0.9),
+            
+            # SecuritySkill
+            (r"(get |show )?defender status", "get_defender_status", 0.95),
+            (r"run defender scan", "run_defender_scan", 0.95),
         ]
         
-        # Keyword-based fallback (when patterns don't match)
+        # Keyword-based fallback
         self.keyword_intents = {
             "shutdown": "shutdown_computer",
             "restart": "restart_computer",
@@ -85,33 +135,22 @@ class SimpleNLU:
             "calculator": "open_application",
             "chrome": "open_application",
             "firefox": "open_application",
+            # Stage 2 keywords
+            "services": "list_services",
+            "performance": "get_system_performance",
+            "workflows": "list_workflows",
+            "recent": "list_recent_files",
         }
     
     def parse(self, text: str) -> Optional[IntentBase]:
-        """
-        Legacy method for backward compatibility.
-        
-        Args:
-            text: User input text
-            
-        Returns:
-            IntentBase or None
-        """
+        """Legacy method for backward compatibility."""
         intent, _ = self.get_intent_with_confidence(text)
         if intent:
             return IntentBase(name=intent.name, slots=intent.slots)
         return None
     
     def get_intent_with_confidence(self, text: str) -> Tuple[Optional[IntentWithConfidence], List[str]]:
-        """
-        Parse user input and extract intent with confidence score.
-        
-        Args:
-            text: User input text
-            
-        Returns:
-            Tuple of (IntentWithConfidence, suggestions)
-        """
+        """Parse user input and extract intent with confidence score."""
         if not text:
             return None, []
         
@@ -121,7 +160,6 @@ class SimpleNLU:
         for pattern, intent_name, confidence in self.patterns:
             match = re.search(pattern, text_lower)
             if match:
-                # Extract slots from regex groups
                 slots = self._extract_slots(match, intent_name, text_lower)
                 
                 return IntentWithConfidence(
@@ -139,24 +177,23 @@ class SimpleNLU:
                 return IntentWithConfidence(
                     name=intent_name,
                     slots=slots,
-                    confidence=0.7,  # Lower confidence for keyword match
+                    confidence=0.7,
                     fuzzy_match=keyword
                 ), []
         
-        # No match
         return None, []
     
     def _extract_slots(self, match, intent_name: str, text: str) -> Dict[str, Any]:
         """Extract slot values from regex match."""
         slots = {}
         
-        # Extract named groups
         if match.groups():
+            # Application control
             if intent_name in ["open_application", "close_application"]:
                 slots["app_name"] = match.group(1)
             
+            # Volume
             elif intent_name == "set_volume":
-                # Extract volume level
                 volume_match = re.search(r"(\d+)", text)
                 if volume_match:
                     slots["level"] = int(volume_match.group(1))
@@ -167,17 +204,37 @@ class SimpleNLU:
                 elif "mute" in text:
                     slots["level"] = 0
             
+            # File operations
             elif intent_name in ["create_folder", "delete_path"]:
-                # Extract path (everything after the command)
                 path_match = re.search(r"(folder|delete) (.+)", text)
                 if path_match:
                     slots["path"] = path_match.group(2).strip()
             
             elif intent_name == "search_files":
-                # Extract search query
                 search_match = re.search(r"(search|find) (?:for )?(.+)", text)
                 if search_match:
                     slots["query"] = search_match.group(2).strip()
+            
+            # Service control - NEW
+            elif intent_name == "control_service":
+                action = match.group(1)  # start/stop/restart
+                service = match.group(2).strip()
+                slots["action"] = action
+                slots["name"] = service
+            
+            elif intent_name == "get_service_status":
+                slots["name"] = match.group(1).strip()
+            
+            # Workflow operations - NEW
+            elif intent_name in ["execute_workflow", "create_workflow"]:
+                workflow_match = re.search(r"workflow (.+)", text)
+                if workflow_match:
+                    slots["name"] = workflow_match.group(1).strip()
+            
+            # Smart home - NEW
+            elif intent_name == "smarthome_toggle":
+                slots["state"] = match.group(1)  # on/off
+                slots["device"] = match.group(2).strip()
         
         return slots
     
@@ -186,14 +243,12 @@ class SimpleNLU:
         slots = {}
         
         if intent_name == "open_application":
-            # Find the app name (the keyword itself)
             for keyword in self.keyword_intents:
                 if keyword in text and self.keyword_intents[keyword] == intent_name:
                     slots["app_name"] = keyword
                     break
         
         elif intent_name == "set_volume":
-            # Try to extract volume level
             volume_match = re.search(r"(\d+)", text)
             if volume_match:
                 slots["level"] = int(volume_match.group(1))
@@ -202,9 +257,7 @@ class SimpleNLU:
 
 
 class ContextManager:
-    """
-    Manages conversation context and history.
-    """
+    """Manages conversation context and history."""
     
     def __init__(self, max_history: int = 20):
         self.history: List[Dict[str, Any]] = []

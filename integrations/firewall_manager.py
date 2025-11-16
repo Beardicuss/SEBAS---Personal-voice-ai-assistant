@@ -8,7 +8,7 @@ import logging
 import subprocess
 import platform
 import shlex
-from sebas.typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict, List, Tuple
 from sebas.enum import Enum
 
 

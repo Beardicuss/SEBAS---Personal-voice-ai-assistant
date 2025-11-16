@@ -9,7 +9,7 @@ Env:
 import os
 import requests
 import logging
-from sebas.typing import Tuple, Dict, List
+from typing import Tuple, Dict, List
 
 
 def get_weather(city: str, units: str = 'metric') -> Tuple[bool, Dict]:

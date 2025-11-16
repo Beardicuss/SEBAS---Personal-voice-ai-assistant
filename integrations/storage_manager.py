@@ -9,7 +9,7 @@ import platform
 import shutil
 import subprocess
 import psutil
-from sebas.typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any
 
 
 class StorageManager:

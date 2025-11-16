@@ -5,7 +5,7 @@ Phase 6.2: Context-aware command execution and learning
 """
 
 from sebas.skills.base_skill import BaseSkill
-from sebas.typing import Dict, Any
+from typing import Dict, Any
 import logging
 
 

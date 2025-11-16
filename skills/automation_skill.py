@@ -5,7 +5,7 @@ Phase 5.1: Workflow automation and script execution
 """
 
 from sebas.skills.base_skill import BaseSkill
-from sebas.typing import Dict, Any
+from typing import Dict, Any
 import logging
 import platform
 from sebas.datetime import datetime, timedelta

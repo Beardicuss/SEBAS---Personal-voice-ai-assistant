@@ -4,7 +4,7 @@ File Skill - Handles file operations like create, search, open with advanced fea
 """
 
 from sebas.skills.base_skill import BaseSkill
-from sebas.typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple
 import logging
 import os
 import shutil

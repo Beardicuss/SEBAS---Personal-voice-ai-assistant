@@ -5,7 +5,7 @@ Phase 1.3.6: API Documentation
 """
 
 from sebas.flask import Blueprint, jsonify
-from sebas.typing import Dict, Any
+from typing import Dict, Any
 
 
 def create_swagger_spec() -> Dict[str, Any]:

@@ -8,7 +8,7 @@ import logging
 import json
 import requests
 from sebas.datetime import datetime
-from sebas.typing import Optional, Dict, List, Any, Tuple
+from typing import Optional, Dict, List, Any, Tuple
 
 
 class TicketSystem:

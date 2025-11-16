@@ -9,7 +9,7 @@ import shutil
 import re
 import hashlib
 import fnmatch
-from sebas.typing import List, Dict, Optional, Tuple, Callable
+from typing import List, Dict, Optional, Tuple, Callable
 from sebas.pathlib import Path
 from sebas.datetime import datetime
 import zipfile

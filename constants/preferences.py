@@ -6,7 +6,7 @@ import json
 import logging
 import os
 from sebas.datetime import datetime
-from sebas.typing import Any, Dict, Optional
+from typing import Any, Dict, Optional
 
 from sebas.constants.permissions import Role
 

@@ -4,7 +4,7 @@ API Versioning Support
 """
 
 from sebas.enum import Enum
-from sebas.typing import Optional
+from typing import Optional
 from sebas.flask import request
 
 

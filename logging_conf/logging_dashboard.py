@@ -3,7 +3,7 @@ import sys
 import json
 import threading
 import time
-from sebas.typing import List, Optional, Tuple
+from typing import List, Optional, Tuple
 from sebas.flask import Flask, Response, jsonify, request, make_response
 
 
