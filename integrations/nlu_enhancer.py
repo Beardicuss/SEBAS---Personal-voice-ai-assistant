@@ -3,6 +3,8 @@ Natural Language Understanding - Stage 2 Enhanced
 Extended pattern matching for all Stage 2 skills
 """
 
+from datetime import datetime
+import logging
 import re
 from dataclasses import dataclass
 from typing import Dict, Any, Optional, List, Tuple
@@ -277,3 +279,101 @@ class ContextManager:
     def get_recent(self, count: int = 5) -> List[Dict[str, Any]]:
         """Get recent context entries."""
         return self.history[-count:] if self.history else []
+# Add these classes to integrations/nlu_enhancer.py after ContextManager
+
+class MultiPartCommandParser:
+    """Parse multi-part commands like 'open chrome and play music'"""
+    
+    def parse_multipart_command(self, text: str) -> List[str]:
+        """Split compound commands"""
+        # Simple split on conjunctions
+        separators = [' and ', ' then ', ' also ', ', ']
+        commands = [text]
+        
+        for sep in separators:
+            new_commands = []
+            for cmd in commands:
+                new_commands.extend(cmd.split(sep))
+            commands = new_commands
+        
+        return [c.strip() for c in commands if c.strip()]
+
+
+class LearningSystem:
+    """Learn from user corrections"""
+    
+    def __init__(self):
+        self.corrections = []
+        self.correction_log = []
+    
+    def record_correction(self, original_intent: str, corrected_intent: str,
+                         original_slots: Dict[str, Any], corrected_slots: Dict[str, Any], 
+                         user_input: str):
+        """Record a user correction for future learning"""
+        correction = {
+            'timestamp': datetime.now().isoformat(),
+            'original': {'intent': original_intent, 'slots': original_slots},
+            'corrected': {'intent': corrected_intent, 'slots': corrected_slots},
+            'input': user_input
+        }
+        self.corrections.append(correction)
+        self.correction_log.append(correction)
+        logging.info(f"[Learning] Recorded correction: {original_intent} -> {corrected_intent}")
+    
+    def get_corrections(self, limit: int = 10) -> List[Dict]:
+        """Get recent corrections"""
+        return self.correction_log[-limit:]
+
+
+class IntentResolver:
+    """Resolve ambiguous intents using context and heuristics"""
+    
+    def __init__(self):
+        self.resolution_history = []
+    
+    def resolve_ambiguous_intent(self, user_input: str, 
+                                 candidates: List[str]) -> Optional[str]:
+        """
+        Choose best intent from candidates.
+        
+        Args:
+            user_input: User's original input
+            candidates: List of possible intent names
+            
+        Returns:
+            Best matching intent or None
+        """
+        if not candidates:
+            return None
+        
+        # Single candidate - easy
+        if len(candidates) == 1:
+            return candidates[0]
+        
+        # Score candidates by keyword matching
+        scores = {}
+        for intent in candidates:
+            score = 0
+            intent_words = intent.lower().replace('_', ' ').split()
+            input_words = user_input.lower().split()
+            
+            # Count matching words
+            for word in intent_words:
+                if word in input_words:
+                    score += 1
+            
+            scores[intent] = score
+        
+        # Return highest scoring intent
+        if scores:
+            best_intent = max(scores.items(), key=lambda x: x[1])[0]
+            self.resolution_history.append({
+                'input': user_input,
+                'candidates': candidates,
+                'resolved': best_intent,
+                'scores': scores
+            })
+            return best_intent
+        
+        # Fallback: return first candidate
+        return candidates[0]

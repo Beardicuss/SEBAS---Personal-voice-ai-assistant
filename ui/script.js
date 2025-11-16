@@ -123,15 +123,147 @@ if(form){
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({text})
       });
-      const j = await res.json().catch(()=>({ok:false}));
-      if(j.ok){
-        result.textContent = 'Done';
-        input.value = '';
-      }else{
-        result.textContent = 'Error';
+      const data = await res.json();
+      // Show info window if display type is specified
+      if (data.display_type && data.display_type !== 'none') {
+          showInfoWindow(data);
       }
+      result.textContent = data.message || 'Done';
+      input.value = '';
     }catch(err){
       result.textContent = 'Network error';
+      showInfoWindow({
+          display_type: 'error',
+          message: 'Communication Error',
+          display_data: {details: err.message}
+      });
     }
   });
+}
+
+let autoCloseTimer = null;
+function showInfoWindow(response) {
+    const infoWindow = document.getElementById('info-window');
+    const infoTitle = document.getElementById('info-title');
+    const infoContent = document.getElementById('info-content');
+    const timerDisplay = document.getElementById('auto-close-timer');
+   
+    // Clear any existing timer
+    if (autoCloseTimer) {
+        clearInterval(autoCloseTimer);
+        autoCloseTimer = null;
+    }
+   
+    // Set window style based on type
+    infoWindow.className = 'info-window';
+    if (response.display_type === 'error') {
+        infoWindow.classList.add('error');
+    } else if (response.display_type === 'warning') {
+        infoWindow.classList.add('warning');
+    }
+   
+    // Set title
+    infoTitle.textContent = response.message || 'Information';
+   
+    // Render content based on display type
+    infoContent.innerHTML = renderDisplayContent(response);
+   
+    // Show window
+    infoWindow.classList.remove('hidden');
+   
+    // Setup auto-close if specified
+    if (response.auto_close_seconds) {
+        let remaining = response.auto_close_seconds;
+        timerDisplay.textContent = `Auto-closing in ${remaining}s`;
+       
+        autoCloseTimer = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                closeInfoWindow();
+            } else {
+                timerDisplay.textContent = `Auto-closing in ${remaining}s`;
+            }
+        }, 1000);
+    } else {
+        timerDisplay.textContent = '';
+    }
+    saveToHistory(response);
+}
+function renderDisplayContent(response) {
+    const data = response.display_data || {};
+   
+    switch(response.display_type) {
+        case 'info':
+            return renderInfoTable(data);
+        case 'list':
+            return renderList(data);
+        case 'error':
+            return renderError(data);
+        default:
+            return `<p>${response.message}</p>`;
+    }
+}
+function renderInfoTable(data) {
+    let html = '<table>';
+    for (const [key, value] of Object.entries(data)) {
+        html += `<tr><td>${key}</td><td>${value}</td></tr>`;
+    }
+    html += '</table>';
+    return html;
+}
+function renderList(data) {
+    const title = data.title || 'Items';
+    const items = data.items || [];
+   
+    let html = `<h4>${title}</h4><ul style="padding-left: 20px;">`;
+    items.forEach(item => {
+        html += `<li>${item}</li>`;
+    });
+    html += '</ul>';
+    return html;
+}
+function renderError(data) {
+    let html = '<div style="color: #ff4444;">';
+    html += '<p><strong>⚠ Error Details:</strong></p>';
+    if (data && data.details) {
+        html += `<p style="font-size: 0.9em;">${data.details}</p>`;
+    }
+    html += '</div>';
+    return html;
+}
+function closeInfoWindow() {
+    const infoWindow = document.getElementById('info-window');
+    infoWindow.classList.add('hidden');
+   
+    if (autoCloseTimer) {
+        clearInterval(autoCloseTimer);
+        autoCloseTimer = null;
+    }
+}
+
+// Store last 10 display events
+const displayHistory = [];
+function saveToHistory(response) {
+    displayHistory.unshift({
+        timestamp: new Date().toISOString(),
+        ...response
+    });
+   
+    // Keep only last 10
+    if (displayHistory.length > 10) {
+        displayHistory.pop();
+    }
+   
+    updateHistoryDisplay();
+}
+function updateHistoryDisplay() {
+    const historyPanel = document.getElementById('display-history');
+    if (!historyPanel) return;
+   
+    historyPanel.innerHTML = displayHistory.map((item, index) => `
+        <div class="history-item" onclick="showInfoWindow(displayHistory[${index}])">
+            <span class="history-time">${new Date(item.timestamp).toLocaleTimeString()}</span>
+            <span class="history-message">${item.message}</span>
+        </div>
+    `).join('');
 }

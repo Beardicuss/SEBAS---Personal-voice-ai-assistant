@@ -10,6 +10,7 @@ import inspect
 from typing import List, Dict, Any, Optional, Set
 from sebas.skills.base_skill import BaseSkill
 import logging
+from sebas.integrations.response_models import SkillResponse, error_response
 
 
 class SkillRegistry:
@@ -135,7 +136,7 @@ class SkillRegistry:
                 return skill
         return None
 
-    def handle_intent(self, intent: str, slots: Dict[str, Any]) -> bool:
+    def handle_intent(self, intent: str, slots: Dict[str, Any]) -> SkillResponse:
         """Handle an intent with backward compatibility."""
         skill = self.get_skill_for_intent(intent)
         if skill:
@@ -144,17 +145,34 @@ class SkillRegistry:
                 sig = inspect.signature(skill.handle)
                 params = list(sig.parameters.keys())
                 
-                if len(params) >= 3:
+                if len(params) >= 4:
                     # Old style: handle(self, intent, slots, sebas)
-                    return skill.handle(intent, slots, self.assistant)
+                    result = skill.handle(intent, slots, self.assistant) # type: ignore
                 else:
                     # New style: handle(self, intent, slots)
-                    return skill.handle(intent, slots)
-                    
-            except Exception:
+                    result = skill.handle(intent, slots)
+                
+                # ✅ Handle both SkillResponse and bool returns
+                if isinstance(result, SkillResponse):
+                    return result
+                elif isinstance(result, bool):
+                    return SkillResponse(
+                        success=result,
+                        message="Command completed" if result else "Command failed"
+                    )
+                else:
+                    # Fallback for unexpected return types
+                    return SkillResponse(
+                        success=True,
+                        message=str(result)
+                    )
+            except Exception as e:
                 self.logger.exception(f"Error in {skill.__class__.__name__}")
-                return False
-        return False
+                return error_response(
+                    message=f"Error in {skill.__class__.__name__}",
+                    details=str(e)
+                )
+        return SkillResponse(success=False, message="No skill found for intent")
 
     def get_all_intents(self) -> List[str]:
         """Get all intents from enabled skills."""
