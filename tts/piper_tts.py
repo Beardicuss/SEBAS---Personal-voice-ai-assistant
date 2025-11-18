@@ -447,7 +447,7 @@ class PiperTTS:
         audio_ok = False
         try:
             test_audio = np.zeros(1000, dtype=np.float32)
-            self._play_audio_with_volume(test_audio, 22050)
+            self._play_audio_with_volume(test_audio, 16000)
             audio_ok = True
         except Exception as e:
             status['audio_error'] = str(e)

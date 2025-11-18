@@ -1,10 +1,8 @@
 """
-Natural Language Understanding - Stage 2 Enhanced
-Extended pattern matching for all Stage 2 skills
+Enhanced NLU - Stage 2 Mk.II with Learning System Integration
+Comprehensive intent recognition for all SEBAS skills + self-learning
 """
 
-from datetime import datetime
-import logging
 import re
 from dataclasses import dataclass
 from typing import Dict, Any, Optional, List, Tuple
@@ -22,117 +20,142 @@ class IntentWithConfidence(IntentBase):
     fuzzy_match: Optional[str] = None
 
 
-class SimpleNLU:
-    """Enhanced NLU with Stage 2 patterns"""
+class EnhancedNLU:
+    """
+    Stage 2 NLU with support for all skills and fuzzy matching.
+    Now includes learning system integration patterns.
+    """
     
     def __init__(self):
-        # Pattern-based intents (regex patterns)
-        self.patterns: List[Tuple[str, str, float]] = [
-            # ============= STAGE 1 - Core =============
+        # Comprehensive pattern library
+        self.patterns: List[Tuple[str, str, float]] = self._build_patterns()
+        
+        # Keyword fallback dictionary
+        self.keyword_intents = self._build_keyword_map()
+    
+    def _build_patterns(self) -> List[Tuple[str, str, float]]:
+        """Build comprehensive pattern library."""
+        patterns = [
+            # ========== LEARNING SYSTEM COMMANDS (NEW) ==========
+            # These have highest priority (1.0 confidence)
+            (r"this means (.+)", "learning_correction", 1.0),
+            (r"that was (.+)", "learning_correction", 1.0),
+            (r"i meant (.+)", "learning_correction", 1.0),
+            (r"correct(?:ion)?[:\s]+(.+)", "learning_correction", 1.0),
+            (r"teach[:\s]+(.+)", "learning_correction", 0.95),
+            
+            # Learning management
+            (r"show learning stats?", "show_learning_stats", 0.98),
+            (r"learning statistics", "show_learning_stats", 0.98),
+            (r"what did you learn", "show_learning_stats", 0.95),
+            (r"optimize learning", "optimize_learning", 0.98),
+            (r"export learning( data)?", "export_learning", 0.98),
+            (r"show (recent )?mistakes", "show_recent_mistakes", 0.98),
+            (r"show problematic skills", "show_problematic_skills", 0.98),
+            (r"what didn't you understand", "show_recent_mistakes", 0.95),
+            (r"which skills fail", "show_problematic_skills", 0.95),
+            
+            # ========== STAGE 1 CORE ==========
             # System commands
             (r"shutdown|shut down|turn off( computer| pc)?", "shutdown_computer", 1.0),
             (r"restart|reboot( computer| pc)?", "restart_computer", 1.0),
             (r"sleep|hibernate", "sleep_computer", 0.9),
             (r"lock( computer| screen)?", "lock_computer", 0.9),
             
-            # Application control
-            (r"open ([a-z]+)", "open_application", 0.95),
-            (r"close ([a-z]+)", "close_application", 0.95),
-            (r"launch ([a-z]+)", "open_application", 0.9),
-            (r"start ([a-z]+)", "open_application", 0.9),
+            # Applications
+            (r"open ([a-zA-Z0-9\s]+)", "open_application", 0.95),
+            (r"close ([a-zA-Z0-9\s]+)", "close_application", 0.95),
+            (r"launch ([a-zA-Z0-9\s]+)", "open_application", 0.9),
+            (r"start ([a-zA-Z0-9\s]+)", "open_application", 0.9),
             
             # System info
-            (r"(get |show |what's )?(my )?ip( address)?", "get_ip_address", 0.95),
-            (r"(get |show |what's )?(the )?cpu( info| usage)?", "get_cpu_info", 0.9),
-            (r"(get |show |what's )?(the )?memory( info| usage)?", "get_memory_info", 0.9),
+            (r"(get |show |what's |whats )?(my )?ip( address)?", "get_ip_address", 0.95),
+            (r"(get |show |what's |whats )?(the )?cpu( info| usage)?", "get_cpu_info", 0.9),
+            (r"(get |show |what's |whats )?(the )?memory( info| usage)?", "get_memory_info", 0.9),
             (r"system (status|health|info)", "get_system_status", 0.95),
-            (r"(check |get )?disk space", "check_disk_space", 0.95),
             
             # Network
             (r"(run |do )?speed test", "run_speed_test", 0.95),
             (r"test (network |internet )?connect(ion|ivity)?", "test_network_connectivity", 0.9),
-            (r"ping", "test_network_connectivity", 0.8),
             
             # Volume
             (r"(set |change )?volume( to)? (\d+)", "set_volume", 0.95),
-            (r"volume up", "set_volume", 0.9),
-            (r"volume down", "set_volume", 0.9),
+            (r"volume (up|down)", "set_volume", 0.9),
             (r"mute", "set_volume", 0.9),
             
             # Time/Date
-            (r"what('s| is) the time", "get_time", 1.0),
-            (r"what('s| is) (the )?date", "get_date", 1.0),
+            (r"what(?:'s| is) the time", "get_time", 1.0),
+            (r"what(?:'s| is) (the )?date", "get_date", 1.0),
             
-            # File operations
-            (r"create folder (.+)", "create_folder", 0.95),
-            (r"delete (.+)", "delete_path", 0.9),
+            # ========== STAGE 2 SKILLS ==========
+            
+            # Storage
+            (r"check disk space", "check_disk_space", 0.95),
+            (r"disk (space|usage|info)", "check_disk_space", 0.9),
+            
+            # Services
+            (r"(start|stop|restart) service (.+)", "control_service", 0.95),
+            (r"(get |show )?service status (.+)", "get_service_status", 0.95),
+            (r"list (all )?services", "list_services", 0.95),
+            
+            # Security
+            (r"(get |show )?defender status", "get_defender_status", 0.95),
+            (r"run defender scan", "run_defender_scan", 0.95),
+            (r"(get |show )?defender threats", "get_defender_threats", 0.9),
+            
+            # Monitoring
+            (r"(get |show )?system performance", "get_system_performance", 0.95),
+            (r"(get |show )?network stats", "get_network_stats", 0.95),
+            (r"(get |show )?disk io", "get_disk_io", 0.9),
+            (r"check (for )?memory leak(s)?", "check_memory_leaks", 0.95),
+            (r"analyze startup", "analyze_startup_impact", 0.95),
+            
+            # Files
+            (r"list recent files", "list_recent_files", 0.95),
+            (r"open recent( file)?( \d+)?", "open_recent_file", 0.95),
+            (r"(create|make) folder (.+)", "create_folder", 0.95),
             (r"search( for)? (.+)", "search_files", 0.85),
             (r"find (.+)", "search_files", 0.85),
             
-            # ============= STAGE 2 - Extended =============
-            # Storage/Disk
-            (r"get disk info", "get_disk_info", 0.95),
-            (r"disk info(rmation)?", "get_disk_info", 0.9),
-            
-            # Security/Defender
-            (r"(get |show )?defender status", "get_defender_status", 0.95),
-            (r"(run |start )?defender scan", "run_defender_scan", 0.95),
-            (r"(get |show )?defender threats", "get_defender_threats", 0.95),
-            
-            # Services
-            (r"start service (.+)", "start_service", 0.95),
-            (r"stop service (.+)", "stop_service", 0.95),
-            (r"restart service (.+)", "restart_service", 0.95),
-            (r"(get |show )?service status (.+)", "get_service_status", 0.95),
-            (r"list services", "list_services", 0.95),
-            
-            # Monitoring
-            (r"(get |show )?(system )?performance", "get_system_performance", 0.95),
-            (r"(get |show )?network stats", "get_network_stats", 0.95),
-            (r"(get |show )?disk (io|activity)", "get_disk_io", 0.95),
-            (r"check memory leaks", "check_memory_leaks", 0.95),
-            (r"analyze startup", "analyze_startup_impact", 0.95),
-            
-            # File operations (extended)
-            (r"(list |show )?recent files", "list_recent_files", 0.95),
-            (r"open recent( file)?", "open_recent_file", 0.9),
-            (r"(show |get )?file info (.+)", "show_file_info", 0.9),
-            
             # Automation
             (r"list workflows", "list_workflows", 0.95),
+            (r"(execute|run) workflow (.+)", "execute_workflow", 0.95),
             (r"create workflow (.+)", "create_workflow", 0.95),
-            (r"execute workflow (.+)", "execute_workflow", 0.95),
-            (r"(list |show )?scheduled tasks", "list_scheduled_tasks", 0.95),
-            (r"set reminder (.+)", "set_reminder", 0.9),
+            (r"set reminder (.+)", "set_reminder", 0.95),
             (r"list reminders", "list_reminders", 0.95),
             
-            # ============= STAGE 2 NEW - Advanced =============
+            # Compliance
+            (r"(get |show )?activity log", "get_activity_log", 0.95),
+            (r"(get |show )?audit (log|events)", "get_audit_events", 0.95),
+            (r"generate compliance report", "generate_compliance_report", 0.95),
+            (r"run compliance check", "run_compliance_check", 0.95),
+            
             # Smart Home
             (r"turn (on|off) (.+)", "smarthome_toggle", 0.9),
-            (r"(switch|toggle) (.+)", "smarthome_toggle", 0.85),
+            (r"(set|adjust) thermostat", "set_thermostat", 0.95),
+            (r"(lock|unlock) (door|doors)", "control_locks", 0.95),
             
             # AI Analytics
             (r"detect anomalies", "detect_anomalies", 0.95),
             (r"predict disk failure", "predict_disk_failure", 0.95),
-            (r"predict memory leak", "predict_memory_leak", 0.95),
-            (r"(get )?performance suggestions", "get_performance_suggestions", 0.95),
-            (r"diagnose (issue|problem)", "diagnose_issue", 0.9),
+            (r"(get |show )?performance suggestions", "get_performance_suggestions", 0.9),
             
-            # Compliance
-            (r"log activity", "log_activity", 0.95),
-            (r"(get |show )?activity log", "get_activity_log", 0.95),
-            (r"(get |show )?audit events", "get_audit_events", 0.95),
-            (r"generate compliance report", "generate_compliance_report", 0.95),
-            
-            # Code
-            (r"create function (.+)", "create_function", 0.95),
-            (r"create class (.+)", "create_class", 0.95),
-            (r"generate loop", "generate_loop", 0.9),
-            (r"list code snippets", "list_code_snippets", 0.95),
+            # Code Generation
+            (r"create (function|class|loop) (.+)", "create_code", 0.9),
+            (r"generate code for (.+)", "create_code", 0.85),
         ]
         
-        # Keyword-based fallback
-        self.keyword_intents = {
+        return patterns
+    
+    def _build_keyword_map(self) -> Dict[str, str]:
+        """Build keyword-to-intent mapping for fallback."""
+        return {
+            # Learning keywords
+            "learn": "show_learning_stats",
+            "stats": "show_learning_stats",
+            "mistakes": "show_recent_mistakes",
+            
+            # Stage 1
             "shutdown": "shutdown_computer",
             "restart": "restart_computer",
             "reboot": "restart_computer",
@@ -145,11 +168,14 @@ class SimpleNLU:
             "notepad": "open_application",
             "calculator": "open_application",
             "chrome": "open_application",
-            "firefox": "open_application",
-            # Stage 2 keywords
-            "defender": "get_defender_status",
+            
+            # Stage 2
             "services": "list_services",
+            "performance": "get_system_performance",
             "workflows": "list_workflows",
+            "recent": "list_recent_files",
+            "defender": "get_defender_status",
+            "compliance": "generate_compliance_report",
             "anomalies": "detect_anomalies",
         }
     
@@ -161,7 +187,7 @@ class SimpleNLU:
         return None
     
     def get_intent_with_confidence(self, text: str) -> Tuple[Optional[IntentWithConfidence], List[str]]:
-        """Parse user input and extract intent with confidence score."""
+        """Parse user input with confidence scoring."""
         if not text:
             return None, []
         
@@ -199,9 +225,16 @@ class SimpleNLU:
         slots = {}
         
         if match.groups():
-            if intent_name in ["open_application", "close_application"]:
-                slots["app_name"] = match.group(1)
+            # Learning correction
+            if intent_name == "learning_correction":
+                # Extract the intent name from "this means X" pattern
+                slots["intent"] = match.group(1).strip()
             
+            # Application control
+            elif intent_name in ["open_application", "close_application"]:
+                slots["app_name"] = match.group(1).strip()
+            
+            # Volume
             elif intent_name == "set_volume":
                 volume_match = re.search(r"(\d+)", text)
                 if volume_match:
@@ -213,6 +246,7 @@ class SimpleNLU:
                 elif "mute" in text:
                     slots["level"] = 0
             
+            # File operations
             elif intent_name in ["create_folder", "delete_path"]:
                 path_match = re.search(r"(folder|delete) (.+)", text)
                 if path_match:
@@ -223,18 +257,26 @@ class SimpleNLU:
                 if search_match:
                     slots["query"] = search_match.group(2).strip()
             
-            # Service operations
-            elif intent_name in ["start_service", "stop_service", "restart_service", "get_service_status"]:
-                service_match = re.search(r"service (.+)", text)
-                if service_match:
-                    slots["name"] = service_match.group(1).strip()
+            # Service control
+            elif intent_name == "control_service":
+                action = match.group(1)
+                service = match.group(2).strip()
+                slots["action"] = action
+                slots["name"] = service
+            
+            elif intent_name == "get_service_status":
+                slots["name"] = match.group(1).strip()
+            
+            # Workflow operations
+            elif intent_name in ["execute_workflow", "create_workflow"]:
+                workflow_match = re.search(r"workflow (.+)", text)
+                if workflow_match:
+                    slots["name"] = workflow_match.group(1).strip()
             
             # Smart home
             elif intent_name == "smarthome_toggle":
-                state_match = re.search(r"turn (on|off) (.+)", text)
-                if state_match:
-                    slots["state"] = state_match.group(1)
-                    slots["device"] = state_match.group(2).strip()
+                slots["state"] = match.group(1)
+                slots["device"] = match.group(2).strip()
         
         return slots
     
@@ -257,11 +299,12 @@ class SimpleNLU:
 
 
 class ContextManager:
-    """Manages conversation context and history."""
+    """Enhanced context management for multi-turn conversations."""
     
     def __init__(self, max_history: int = 20):
         self.history: List[Dict[str, Any]] = []
         self.max_history = max_history
+        self.context_vars: Dict[str, Any] = {}
     
     def add(self, entry: Dict[str, Any]):
         """Add entry to context history."""
@@ -279,101 +322,23 @@ class ContextManager:
     def get_recent(self, count: int = 5) -> List[Dict[str, Any]]:
         """Get recent context entries."""
         return self.history[-count:] if self.history else []
-# Add these classes to integrations/nlu_enhancer.py after ContextManager
-
-class MultiPartCommandParser:
-    """Parse multi-part commands like 'open chrome and play music'"""
     
-    def parse_multipart_command(self, text: str) -> List[str]:
-        """Split compound commands"""
-        # Simple split on conjunctions
-        separators = [' and ', ' then ', ' also ', ', ']
-        commands = [text]
-        
-        for sep in separators:
-            new_commands = []
-            for cmd in commands:
-                new_commands.extend(cmd.split(sep))
-            commands = new_commands
-        
-        return [c.strip() for c in commands if c.strip()]
+    def set_var(self, key: str, value: Any):
+        """Set a context variable."""
+        self.context_vars[key] = value
+    
+    def get_var(self, key: str, default: Any = None) -> Any:
+        """Get a context variable."""
+        return self.context_vars.get(key, default)
+    
+    def clear(self):
+        """Clear all context."""
+        self.history.clear()
+        self.context_vars.clear()
 
 
-class LearningSystem:
-    """Learn from user corrections"""
-    
-    def __init__(self):
-        self.corrections = []
-        self.correction_log = []
-    
-    def record_correction(self, original_intent: str, corrected_intent: str,
-                         original_slots: Dict[str, Any], corrected_slots: Dict[str, Any], 
-                         user_input: str):
-        """Record a user correction for future learning"""
-        correction = {
-            'timestamp': datetime.now().isoformat(),
-            'original': {'intent': original_intent, 'slots': original_slots},
-            'corrected': {'intent': corrected_intent, 'slots': corrected_slots},
-            'input': user_input
-        }
-        self.corrections.append(correction)
-        self.correction_log.append(correction)
-        logging.info(f"[Learning] Recorded correction: {original_intent} -> {corrected_intent}")
-    
-    def get_corrections(self, limit: int = 10) -> List[Dict]:
-        """Get recent corrections"""
-        return self.correction_log[-limit:]
+# Aliases for backward compatibility
+SimpleNLU = EnhancedNLU
 
 
-class IntentResolver:
-    """Resolve ambiguous intents using context and heuristics"""
-    
-    def __init__(self):
-        self.resolution_history = []
-    
-    def resolve_ambiguous_intent(self, user_input: str, 
-                                 candidates: List[str]) -> Optional[str]:
-        """
-        Choose best intent from candidates.
-        
-        Args:
-            user_input: User's original input
-            candidates: List of possible intent names
-            
-        Returns:
-            Best matching intent or None
-        """
-        if not candidates:
-            return None
-        
-        # Single candidate - easy
-        if len(candidates) == 1:
-            return candidates[0]
-        
-        # Score candidates by keyword matching
-        scores = {}
-        for intent in candidates:
-            score = 0
-            intent_words = intent.lower().replace('_', ' ').split()
-            input_words = user_input.lower().split()
-            
-            # Count matching words
-            for word in intent_words:
-                if word in input_words:
-                    score += 1
-            
-            scores[intent] = score
-        
-        # Return highest scoring intent
-        if scores:
-            best_intent = max(scores.items(), key=lambda x: x[1])[0]
-            self.resolution_history.append({
-                'input': user_input,
-                'candidates': candidates,
-                'resolved': best_intent,
-                'scores': scores
-            })
-            return best_intent
-        
-        # Fallback: return first candidate
-        return candidates[0]
+__all__ = ['EnhancedNLU', 'SimpleNLU', 'IntentBase', 'IntentWithConfidence', 'ContextManager']

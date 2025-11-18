@@ -2,6 +2,7 @@
 SEBAS CORE MAIN CONTROLLER – Stage 1 Mk.I ENHANCED
 Clean, modular, stable architecture for voice assistant.
 Unicode-safe logging for Windows.
+WITH LEARNING SYSTEM INTEGRATION - ALL PYLANCE ERRORS FIXED
 """
 
 import logging
@@ -31,6 +32,15 @@ from sebas.events.event_bus import EventBus
 
 # === Permissions ===
 from sebas.constants.permissions import Role, is_authorized
+
+# === Learning System ===
+from sebas.integrations.learning_system import LearningSystem, LearningNLU
+from sebas.integrations.learning_integration import (
+    LearningSEBASIntegration,
+    VoiceLearningHelper,
+    CommandHistory,
+    LearningSkill
+)
 
 
 # ============================================================
@@ -84,12 +94,42 @@ class Sebas:
         self.language_manager.bind_tts(self.tts)
 
         # --------------------------------------------------
-        # Skill System — Auto Loader
+        # Skill System – Auto Loader
         # --------------------------------------------------
         self.skill_registry = SkillRegistry(
             assistant_ref=self,
             skills_dir="skills"
         )
+
+        # --------------------------------------------------
+        # Learning System Integration
+        # --------------------------------------------------
+        try:
+            logging.info("[SEBAS] Initializing learning system...")
+            self.learning = LearningSystem()
+            
+            # Wrap existing NLU with learning capabilities
+            original_nlu = self.nlu
+            self.nlu = LearningNLU(original_nlu, self.learning)
+            
+            # Create learning integrations
+            self.learning_integration = LearningSEBASIntegration(self.learning, self)
+            self.voice_learning = VoiceLearningHelper(self.learning)
+            self.command_history = CommandHistory(max_history=100)
+            
+            # Register learning skill for voice commands
+            learning_skill = LearningSkill(self.learning_integration)
+            # Type ignore because LearningSkill is a duck-typed skill
+            self.skill_registry.skills.append(learning_skill)  # type: ignore
+            
+            logging.info("[SEBAS] Learning system initialized successfully")
+        except Exception as e:
+            logging.error(f"[SEBAS] Learning system initialization failed: {e}")
+            logging.exception("[SEBAS] Full error details:")
+            logging.info("[SEBAS] Continuing without learning capabilities")
+            # System will work without learning
+            self.learning = None
+            self.learning_integration = None
 
         # --------------------------------------------------
         # Wake Word Detector
@@ -167,9 +207,9 @@ class Sebas:
     # ========================================================
     #           Command Parsing + Intent Handling
     # ========================================================
-    def parse_and_execute(self, raw_command: str) -> str:
+    def parse_and_execute(self, raw_command: str, source: str = 'voice') -> str:
         """
-        NLU pipeline with event hooks.
+        NLU pipeline with event hooks and learning support.
         Returns response message for UI/API.
         """
         if not raw_command:
@@ -197,16 +237,45 @@ class Sebas:
                 self.speak(msg)
                 return msg
 
-        # -------- Natural Language Understanding --------
-        intent, suggestions = self.nlu.get_intent_with_confidence(command)
+        # -------- Natural Language Understanding (with Learning) --------
+        intent = None
+        try:
+            # Use learning-enhanced NLU if available
+            if hasattr(self.nlu, 'parse'):
+                # LearningNLU accepts source parameter
+                if isinstance(self.nlu, LearningNLU):
+                    intent = self.nlu.parse(command, source=source)
+                else:
+                    # Basic NLU doesn't accept source
+                    intent = self.nlu.parse(command)
+            elif hasattr(self.nlu, 'get_intent_with_confidence'):
+                # Fallback to basic NLU
+                intent, suggestions = self.nlu.get_intent_with_confidence(command)
+        except Exception as e:
+            logging.error(f"[NLU] Error parsing command: {e}")
+            logging.exception("[NLU] Full traceback:")
+            intent = None
 
-        if not intent:
+        if not intent or not hasattr(intent, 'name') or not intent.name:
             self.events.emit("core.intent_failed", None)
-            msg = "I did not understand, sir."
+            
+            # Track failed command for learning
+            if hasattr(self, 'command_history'):
+                self.command_history.add(command, None, source, False)
+            
+            msg = "I did not understand, sir. You can teach me by saying: 'this means' followed by the intent name."
             self.speak(msg)
             return msg
 
         self.events.emit("core.intent_detected", intent)
+
+        # -------- Handle Learning Correction --------
+        if intent.name == 'learning_correction':
+            corrected_intent = intent.slots.get('intent', '')
+            if hasattr(self, 'learning_integration') and self.learning_integration:
+                success = self.learning_integration.handle_learning_correction(command, corrected_intent)
+                return "Learning correction applied" if success else "Learning correction failed"
+            return "Learning system not available"
 
         # Save context
         self.context.add(
@@ -214,7 +283,7 @@ class Sebas:
                 "type": "intent",
                 "name": intent.name,
                 "slots": intent.slots,
-                "confidence": intent.confidence,
+                "confidence": getattr(intent, 'confidence', 1.0),
             }
         )
 
@@ -226,14 +295,48 @@ class Sebas:
             return msg
 
         # -------- Dispatch to Skills --------
-        handled = self.skill_registry.handle_intent(intent.name, intent.slots)
-
-        if handled:
-            self.events.emit("core.intent_handled", intent)
-            return f"Command executed: {intent.name}"
-        else:
-            self.events.emit("core.intent_unhandled", intent)
-            msg = "This command is not implemented yet, sir."
+        try:
+            result = self.skill_registry.handle_intent(intent.name, intent.slots)
+            
+            # Extract boolean success from result
+            # Handle both bool and SkillResponse types
+            if hasattr(result, 'success'):
+                # It's a SkillResponse object
+                handled = result.success
+            else:
+                # It's a boolean
+                handled = bool(result)
+            
+            # Track execution for learning
+            if hasattr(self, 'learning_integration') and self.learning_integration:
+                self.learning_integration.track_skill_execution(
+                    intent.name, 
+                    handled,
+                    error=None if handled else "Skill execution failed"
+                )
+            
+            # Track in command history
+            if hasattr(self, 'command_history'):
+                self.command_history.add(command, intent.name, source, handled)
+            
+            if handled:
+                self.events.emit("core.intent_handled", intent)
+                return f"Command executed: {intent.name}"
+            else:
+                self.events.emit("core.intent_unhandled", intent)
+                msg = "This command is not implemented yet, sir."
+                self.speak(msg)
+                return msg
+                
+        except Exception as e:
+            logging.exception(f"[SKILL] Error executing intent {intent.name}")
+            if hasattr(self, 'learning_integration') and self.learning_integration:
+                self.learning_integration.track_skill_execution(
+                    intent.name, 
+                    False,
+                    error=str(e)
+                )
+            msg = "An error occurred while executing the command."
             self.speak(msg)
             return msg
 
@@ -299,6 +402,11 @@ def main():
         logging.info("[INFO] Say 'SEBAS' followed by your command")
         logging.info("[INFO] Example: 'SEBAS open notepad' or 'SEBAS what time is it'")
         logging.info("[INFO] Or type commands in the web UI")
+        
+        # Only mention learning if it's active
+        if hasattr(assistant, 'learning') and assistant.learning:
+            logging.info("[INFO] Learning system is active - teach SEBAS new commands!")
+        
         logging.info("Press Ctrl+C to exit")
 
         # Keep process alive

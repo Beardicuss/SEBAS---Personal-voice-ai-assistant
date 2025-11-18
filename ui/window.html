@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+/* Info Window Styles */
+.info-window {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.info-window.show {
+    opacity: 1;
+    pointer-events: all;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.info-window-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.info-window-overlay.show {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.info-window-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    color: white;
+}
+
+.info-window-title {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.info-window-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.2s;
+}
+
+.info-window-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+
+.info-window-content {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 20px;
+    color: #333;
+}
+
+/* Display Types */
+.display-text {
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.display-list {
+    list-style: none;
+    padding: 0;
+}
+
+.display-list li {
+    padding: 10px;
+    margin: 5px 0;
+    background: #f0f0f0;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.display-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+}
+
+.display-table th {
+    background: #667eea;
+    color: white;
+    padding: 12px;
+    text-align: left;
+}
+
+.display-table td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.display-card {
+    display: grid;
+    gap: 15px;
+}
+
+.display-card-field {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.display-card-label {
+    font-weight: bold;
+    color: #667eea;
+}
+
+.display-alert {
+    padding: 15px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.display-alert.warning {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+}
+
+.display-alert.error {
+    background: #f8d7da;
+    border-left: 4px solid #dc3545;
+}
+
+.display-alert.success {
+    background: #d4edda;
+    border-left: 4px solid #28a745;
+}
+
+.display-code {
+    background: #282c34;
+    color: #abb2bf;
+    padding: 15px;
+    border-radius: 10px;
+    font-family: 'Courier New', monospace;
+    overflow-x: auto;
+}
+
+/* History Button */
+.history-button {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    background: #667eea;
+    color: white;
+    border: none;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 20px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s;
+}
+
+.history-button:hover {
+    transform: scale(1.1);
+    background: #764ba2;
+}
+
+/* Auto-close timer */
+.info-window-timer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.5);
+    transition: width linear;
+}
+</style>
+</head>
+<body>
+
+<!-- Info Window Overlay -->
+<div class="info-window-overlay" id="infoOverlay"></div>
+
+<!-- Info Window -->
+<div class="info-window" id="infoWindow">
+    <div class="info-window-header">
+        <div class="info-window-title" id="infoTitle">Information</div>
+        <button class="info-window-close" onclick="closeInfoWindow()">×</button>
+    </div>
+    <div class="info-window-content" id="infoContent">
+        <!-- Dynamic content -->
+    </div>
+    <div class="info-window-timer" id="infoTimer"></div>
+</div>
+
+<!-- History Button -->
+<button class="history-button" onclick="showHistory()" title="View History">📋</button>
+
+<script>
+// Info Window Manager
+class InfoWindowManager {
+    constructor() {
+        this.window = document.getElementById('infoWindow');
+        this.overlay = document.getElementById('infoOverlay');
+        this.title = document.getElementById('infoTitle');
+        this.content = document.getElementById('infoContent');
+        this.timer = document.getElementById('infoTimer');
+        
+        this.history = [];
+        this.autoCloseTimeout = null;
+        this.isOpen = false;
+    }
+    
+    show(data) {
+        // Store in history
+        this.history.push({
+            ...data,
+            timestamp: new Date().toISOString()
+        });
+        if (this.history.length > 50) this.history.shift();
+        
+        // Set content
+        this.title.textContent = data.visual?.title || 'Information';
+        this.content.innerHTML = this.renderContent(data);
+        
+        // Show window
+        this.window.classList.add('show');
+        this.overlay.classList.add('show');
+        this.isOpen = true;
+        
+        // Auto-close timer
+        if (data.visual?.duration) {
+            this.startAutoClose(data.visual.duration);
+        }
+    }
+    
+    close() {
+        this.window.classList.remove('show');
+        this.overlay.classList.remove('show');
+        this.isOpen = false;
+        
+        if (this.autoCloseTimeout) {
+            clearTimeout(this.autoCloseTimeout);
+            this.autoCloseTimeout = null;
+        }
+    }
+    
+    startAutoClose(duration) {
+        // Visual timer
+        this.timer.style.width = '100%';
+        this.timer.style.transition = `width ${duration}s linear`;
+        setTimeout(() => {
+            this.timer.style.width = '0%';
+        }, 10);
+        
+        // Auto-close
+        this.autoCloseTimeout = setTimeout(() => {
+            this.close();
+        }, duration * 1000);
+    }
+    
+    renderContent(data) {
+        const visual = data.visual;
+        if (!visual) {
+            return `<div class="display-text">${data.text}</div>`;
+        }
+        
+        switch (visual.type) {
+            case 'text':
+                return this.renderText(data.text);
+            case 'list':
+                return this.renderList(visual.data);
+            case 'table':
+                return this.renderTable(visual.data);
+            case 'card':
+                return this.renderCard(visual.data);
+            case 'alert':
+                return this.renderAlert(visual.data);
+            case 'code':
+                return this.renderCode(visual.data);
+            default:
+                return `<div class="display-text">${data.text}</div>`;
+        }
+    }
+    
+    renderText(text) {
+        return `<div class="display-text">${text}</div>`;
+    }
+    
+    renderList(data) {
+        const items = data.items || [];
+        return `
+            <ul class="display-list">
+                ${items.map(item => `<li>${item}</li>`).join('')}
+            </ul>
+        `;
+    }
+    
+    renderTable(data) {
+        const headers = data.headers || [];
+        const rows = data.rows || [];
+        
+        return `
+            <table class="display-table">
+                <thead>
+                    <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+                </thead>
+                <tbody>
+                    ${rows.map(row => 
+                        `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`
+                    ).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+    
+    renderCard(data) {
+        const fields = data.fields || {};
+        return `
+            <div class="display-card">
+                ${Object.entries(fields).map(([key, value]) => `
+                    <div class="display-card-field">
+                        <span class="display-card-label">${key}:</span>
+                        <span>${value}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    renderAlert(data) {
+        const type = data.alert_type || 'warning';
+        const message = data.message || '';
+        
+        const icons = {
+            warning: '⚠️',
+            error: '❌',
+            success: '✅'
+        };
+        
+        return `
+            <div class="display-alert ${type}">
+                <span style="font-size: 24px;">${icons[type]}</span>
+                <span>${message}</span>
+            </div>
+        `;
+    }
+    
+    renderCode(data) {
+        const code = data.code || '';
+        const language = data.language || 'text';
+        
+        return `
+            <div class="display-code">
+                <pre><code>${this.escapeHtml(code)}</code></pre>
+            </div>
+        `;
+    }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    showHistory() {
+        const historyHtml = this.history.slice(-10).reverse().map((item, idx) => `
+            <div style="padding: 10px; border-bottom: 1px solid #ddd; cursor: pointer;" 
+                 onclick="infoWindowManager.show(${JSON.stringify(item).replace(/"/g, '&quot;')})">
+                <strong>${item.visual?.title || 'Message'}</strong>
+                <br>
+                <small>${new Date(item.timestamp).toLocaleString()}</small>
+            </div>
+        `).join('');
+        
+        this.show({
+            text: 'Display History',
+            visual: {
+                title: '📋 Recent Displays',
+                type: 'text',
+                duration: 30
+            },
+            auto_display: true
+        });
+        
+        this.content.innerHTML = historyHtml || '<p>No history yet</p>';
+    }
+}
+
+// Initialize
+const infoWindowManager = new InfoWindowManager();
+
+// Global functions
+function closeInfoWindow() {
+    infoWindowManager.close();
+}
+
+function showHistory() {
+    infoWindowManager.showHistory();
+}
+
+// Close on overlay click
+document.getElementById('infoOverlay').onclick = closeInfoWindow;
+
+// API Integration
+function handleResponse(response) {
+    // Check if visual display is requested
+    if (response.auto_display && response.visual) {
+        infoWindowManager.show(response);
+    }
+}
+
+// Example: Handle responses from SEBAS backend
+async function sendCommand(command) {
+    try {
+        const response = await fetch('/api/command', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: command})
+        });
+        
+        const data = await response.json();
+        
+        // Speak the response
+        speak(data.response);
+        
+        // Show visual display if requested
+        if (data.auto_display) {
+            handleResponse(data);
+        }
+        
+    } catch (error) {
+        console.error('Command failed:', error);
+    }
+}
+
+// Test function
+function testInfoWindow() {
+    // Test card display
+    infoWindowManager.show({
+        text: "Your IP address is 192.168.1.100",
+        visual: {
+            type: 'card',
+            title: 'Network Information',
+            data: {
+                fields: {
+                    'Hostname': 'DESKTOP-PC',
+                    'IP Address': '192.168.1.100',
+                    'Network': 'Local',
+                    'Status': '✓ Connected'
+                }
+            },
+            duration: 10
+        },
+        auto_display: true
+    });
+}
+</script>
+
+</body>
+</html>
