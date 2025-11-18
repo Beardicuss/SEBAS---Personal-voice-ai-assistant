@@ -1,6 +1,6 @@
-# === Python garbage ===
-**/__pycache__/
+# Ignore all __pycache__ recursively
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 
