@@ -9,7 +9,7 @@ import platform
 import shlex
 import ctypes
 from typing import Optional, Dict, List, Tuple
-from sebas.enum import Enum
+from enum import Enum
 
 
 class ServiceState(Enum):

@@ -9,7 +9,7 @@ import subprocess
 import platform
 import shlex
 from typing import Optional, Dict, List, Tuple
-from sebas.enum import Enum
+from enum import Enum
 
 
 class FirewallRuleDirection(Enum):

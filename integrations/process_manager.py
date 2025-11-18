@@ -4,7 +4,7 @@ import subprocess
 import psutil
 import ctypes
 from typing import Optional, Dict, List, Tuple
-from sebas.enum import Enum
+from enum import Enum
 
 WINDOWS_AVAILABLE = platform.system() == "Windows"
 

@@ -237,7 +237,7 @@ class PiperTTS:
                     for audio_chunk in self.voice.synthesize(text):
                         if hasattr(audio_chunk, 'audio_float_array'):
                             # Convert float32 to int16
-                            audio_int16 = (audio_chunk.audio_float_array * 32767).astype(np.int16)
+                            audio_int16 = (audio_chunk.audio_float_array * 16000).astype(np.int16)
                             wav_file.writeframes(audio_int16.tobytes())
                 
                 # Read back from buffer
@@ -247,7 +247,7 @@ class PiperTTS:
                 
                 # Convert back to float32 for playback
                 audio_int16 = np.frombuffer(audio_data, dtype=np.int16)
-                audio_float = audio_int16.astype(np.float32) / 32767.0
+                audio_float = audio_int16.astype(np.float32) / 16000.0
                 
                 logging.info(f"[PiperTTS] Fallback: Playing {len(audio_float)} samples...")
                 self._play_audio_with_volume(audio_float, sample_rate)

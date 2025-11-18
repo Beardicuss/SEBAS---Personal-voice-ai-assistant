@@ -5,10 +5,10 @@ Simplified for core functionality only
 """
 
 from sebas.skills.base_skill import BaseSkill
-from sebas.typing import Dict, Any
+from typing import Dict, Any
 import logging
 import platform
-from sebas.datetime import datetime, timedelta
+from datetime import datetime, timedelta
 
 
 class AutomationSkill(BaseSkill):

@@ -5,7 +5,7 @@ Works from ANY location. Autodetects project structure.
 
 import os
 import sys
-from sebas.pathlib import Path
+from pathlib import Path
 
 print("\n========== SEBAS STRUCTURE REPAIR ==========\n")
 

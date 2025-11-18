@@ -9,7 +9,7 @@ import platform
 import json
 import shlex
 from typing import Optional, Dict, List, Tuple
-from sebas.enum import Enum
+from enum import Enum
 
 
 class VPNConnectionState(Enum):

@@ -8,8 +8,8 @@ import logging
 import subprocess
 import platform
 from typing import Optional, Dict, List, Tuple
-from sebas.datetime import datetime
-from sebas.enum import Enum
+from datetime import datetime
+from enum import Enum
 
 
 class TaskTriggerType(Enum):

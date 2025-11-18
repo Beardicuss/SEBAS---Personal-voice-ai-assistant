@@ -10,8 +10,8 @@ import socket
 import threading
 import time
 from typing import Dict, List, Optional, Set, Tuple, Callable
-from sebas.datetime import datetime
-from sebas.enum import Enum
+from datetime import datetime
+from enum import Enum
 
 
 class PortState(Enum):

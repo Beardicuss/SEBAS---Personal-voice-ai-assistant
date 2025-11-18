@@ -5,7 +5,7 @@ Preference storage for SEBAS, including role persistence.
 import json
 import logging
 import os
-from sebas.datetime import datetime
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 from sebas.constants.permissions import Role

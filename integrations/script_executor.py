@@ -10,7 +10,7 @@ import platform
 import os
 import sys
 from typing import Optional, Dict, Tuple, List
-from sebas.pathlib import Path
+from pathlib import Path
 import tempfile
 
 

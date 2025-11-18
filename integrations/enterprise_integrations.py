@@ -7,7 +7,7 @@ Phase 5.2: Ticket systems, monitoring, asset management
 import logging
 import json
 import requests
-from sebas.datetime import datetime
+from datetime import datetime
 from typing import Optional, Dict, List, Any, Tuple
 
 
@@ -92,90 +92,6 @@ class ServiceNowIntegration(TicketSystem):
             return False, str(e)
         except Exception:
             logging.exception("[ServiceNow] Unexpected error updating ticket")
-            return False, "Unexpected failure"
-
-
-# ------------------- Jira -------------------
-class JiraIntegration(TicketSystem):
-    """Jira ticket system integration."""
-
-    def __init__(self, server_url: str, username: str, api_token: str):
-        self.server_url = server_url.rstrip('/')
-        self.username = username
-        self.api_token = api_token
-        self.api_base = f"{self.server_url}/rest/api/2"
-
-    def create_ticket(self, title: str, description: str, project_key: str = "PROJ",
-                      issue_type: str = "Task", **kwargs) -> Tuple[bool, Any]:
-        """Create a Jira issue."""
-        try:
-            from requests.auth import HTTPBasicAuth
-            issue_data = {
-                'fields': {
-                    'project': {'key': project_key},
-                    'summary': title,
-                    'description': description,
-                    'issuetype': {'name': issue_type},
-                    **kwargs.get('fields', {})
-                }
-            }
-            response = requests.post(
-                f"{self.api_base}/issue",
-                json=issue_data,
-                auth=HTTPBasicAuth(self.username, self.api_token),
-                headers={'Content-Type': 'application/json'},
-                timeout=15
-            )
-            if 200 <= response.status_code < 300:
-                return True, response.json()
-            logging.warning(f"[Jira] API error {response.status_code}: {response.text[:120]}")
-            return False, {"error": f"HTTP {response.status_code}"}
-        except requests.RequestException as e:
-            logging.exception("[Jira] Network error while creating ticket")
-            return False, {"error": str(e)}
-        except Exception:
-            logging.exception("[Jira] Unexpected error creating ticket")
-            return False, {}
-
-    def get_ticket(self, ticket_id: str) -> Tuple[bool, Any]:
-        """Retrieve Jira issue details."""
-        try:
-            from requests.auth import HTTPBasicAuth
-            response = requests.get(
-                f"{self.api_base}/issue/{ticket_id}",
-                auth=HTTPBasicAuth(self.username, self.api_token),
-                timeout=15
-            )
-            if 200 <= response.status_code < 300:
-                return True, response.json()
-            return False, {"error": f"HTTP {response.status_code}"}
-        except requests.RequestException as e:
-            logging.exception("[Jira] Network error while fetching ticket")
-            return False, {"error": str(e)}
-        except Exception:
-            logging.exception("[Jira] Unexpected error fetching ticket")
-            return False, {}
-
-    def update_ticket(self, ticket_id: str, updates: Dict[str, Any]) -> Tuple[bool, str]:
-        """Update a Jira issue."""
-        try:
-            from requests.auth import HTTPBasicAuth
-            issue_data = {'fields': updates}
-            response = requests.put(
-                f"{self.api_base}/issue/{ticket_id}",
-                json=issue_data,
-                auth=HTTPBasicAuth(self.username, self.api_token),
-                headers={'Content-Type': 'application/json'},
-                timeout=15
-            )
-            if 200 <= response.status_code < 300:
-                return True, "Ticket updated"
-            return False, f"HTTP {response.status_code}"
-        except requests.RequestException as e:
-            logging.exception("[Jira] Network error while updating ticket")
-            return False, str(e)
-        except Exception:
-            logging.exception("[Jira] Unexpected error updating ticket")
             return False, "Unexpected failure"
 
 

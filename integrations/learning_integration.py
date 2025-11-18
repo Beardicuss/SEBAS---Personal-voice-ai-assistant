@@ -210,13 +210,11 @@ class CommandHistory:
         self.history: List[Dict[str, Any]] = []
         self.max_history = max_history
     
-    def add(self, command: str, intent: Optional[str], 
-           source: str, success: bool):
+    def add(self, command: str, intent: Optional[str], success: bool):
         """Add command to history."""
         entry = {
             'command': command,
             'intent': intent,
-            'source': source,
             'success': success,
             'timestamp': datetime.now().isoformat()
         }

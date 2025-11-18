@@ -4,25 +4,12 @@ Automation Skill
 Phase 5.1: Workflow automation and script execution
 """
 
+from datetime import datetime, timedelta, date
 from sebas.skills.base_skill import BaseSkill
 from typing import Dict, Any
 import logging
 import platform
-from sebas.datetime import datetime, timedelta
-from sebas.integrations.email_client import EmailClient, fetch_email_summaries
-client = EmailClient()
-print(client.send_mail("me@domain.com", "Test", "Hello"))
-print(fetch_email_summaries(2))
-from sebas.integrations.ms_graph_auth import get_access_token
-print(get_access_token())
-from sebas.integrations.enterprise_integrations import JiraIntegration, DocumentationGenerator
 
-jira = JiraIntegration("https://fake.atlassian.net", "user", "token")
-ok, resp = jira.create_ticket("Test", "This is a test")
-print(ok, resp)
-
-docs = DocumentationGenerator().generate_configuration_documentation({"debug": True, "version": "1.0"})
-print(docs[:200])
 from sebas.integrations.event_system import EventSystem, EventType
 
 sys = EventSystem()
@@ -89,10 +76,8 @@ class AutomationSkill(BaseSkill):
     def _init_managers(self):
         """Initialize automation managers."""
         try:
-            from sebas.integrations.automation_engine import AutomationEngine
             from sebas.integrations.script_executor import ScriptExecutor
             from sebas.integrations.task_scheduler import TaskScheduler
-            self.automation_engine = AutomationEngine()
             self.script_executor = ScriptExecutor()
             self.task_scheduler = TaskScheduler() if platform.system() == 'Windows' else None
         except Exception:
@@ -686,7 +671,7 @@ class AutomationSkill(BaseSkill):
             m = re.search(r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b", txt_clean)
             if m:
                 y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
-                date_dt = datetime(y, mo, d)
+                date_dt = datetime.now().replace(year=y, month=mo, day=d)
                 txt_clean = txt_clean.replace(m.group(0), '').strip()
             else:
                 # M/D or M/D/YYYY
@@ -696,7 +681,7 @@ class AutomationSkill(BaseSkill):
                     y = int(m.group(3)) if m.group(3) else now.year
                     if y < 100:
                         y += 2000
-                    date_dt = datetime(y, mo, d)
+                    date_dt = datetime.now().replace(year=y, month=mo, day=d)
                     txt_clean = txt_clean.replace(m.group(0), '').strip()
                 else:
                     # Month name forms (Nov 12, 2025)
@@ -715,7 +700,7 @@ class AutomationSkill(BaseSkill):
                         mo = months[m.group(1)]
                         d = int(m.group(2))
                         y = int(m.group(3)) if m.group(3) else now.year
-                        date_dt = datetime(y, mo, d)
+                        date_dt = datetime.now().replace(year=y, month=mo, day=d)
                         txt_clean = txt_clean.replace(m.group(0), '').strip()
 
             if date_dt is not None:
@@ -727,7 +712,7 @@ class AutomationSkill(BaseSkill):
                 days_to_monday = (7 - now.weekday()) % 7
                 if days_to_monday == 0:
                     days_to_monday = 7
-                base_next_monday = now + timedelta(days=days_to_monday)
+                base_next_monday = now + datetime.timedelta(days=days_to_monday)
                 # If a weekday specified, jump to that weekday after next Monday
                 weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
                 found_wd = None
@@ -738,11 +723,11 @@ class AutomationSkill(BaseSkill):
                 if found_wd is None:
                     start_day = base_next_monday
                 else:
-                    start_day = base_next_monday + timedelta(days=found_wd)
+                    start_day = base_next_monday + datetime.timedelta(days=found_wd)
                 txt_clean = txt_clean.replace('next week', '').strip()
 
             if 'tomorrow' in txt_clean:
-                start_day = now + timedelta(days=1)
+                start_day = now + datetime.timedelta(days=1)
                 txt_clean = txt_clean.replace('tomorrow', '').strip()
             elif 'today' in txt_clean:
                 txt_clean = txt_clean.replace('today', '').strip()
@@ -755,7 +740,7 @@ class AutomationSkill(BaseSkill):
                         days_ahead = (i - now.weekday()) % 7
                         if days_ahead == 0:
                             days_ahead = 7
-                        start_day = now + timedelta(days=days_ahead)
+                        start_day = now + datetime.timedelta(days=days_ahead)
                         txt_clean = txt_clean.replace(f'on {wd}', '').replace(wd, '').strip()
                         break
 
@@ -787,9 +772,9 @@ class AutomationSkill(BaseSkill):
             start_dt = start_day.replace(hour=hour or 9, minute=minute, second=0, microsecond=0)
             # If chosen time today but already past, move to next day at same time
             if start_dt < now:
-                start_dt = start_dt + timedelta(days=1)
+                start_dt = start_dt + datetime.timedelta(days=1)
 
-            end_dt = start_dt + timedelta(minutes=dur_minutes)
+            end_dt = start_dt + datetime.timedelta(minutes=dur_minutes)
             start_iso = start_dt.strftime('%Y-%m-%dT%H:%M:%S')
             end_iso = end_dt.strftime('%Y-%m-%dT%H:%M:%S')
 

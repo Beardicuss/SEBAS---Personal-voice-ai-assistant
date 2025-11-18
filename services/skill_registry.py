@@ -5,7 +5,6 @@ Loads all Stage 1 + Stage 2 skills with dependency management
 """
 
 import os
-import importlib.util
 import inspect
 from typing import List, Dict, Any, Optional, Set
 from sebas.skills.base_skill import BaseSkill
@@ -62,7 +61,7 @@ class SkillRegistry:
         
         # Stage 2: Enterprise skills (optional, may fail gracefully)
         stage2_enterprise = [
-            'sebas.skills.smart_home_skill',  # Smart home control
+            #'sebas.skills.smart_home_skill',  # Smart home control
             'sebas.skills.ai_analytics_skill',# AI predictions
             'sebas.skills.compliance_skill',  # Audit & compliance
             'sebas.skills.code_skill',        # Voice-to-code
@@ -96,12 +95,8 @@ class SkillRegistry:
     def _load_skill_module(self, module_name: str):
         """Load a skill module with enhanced error handling."""
         try:
-            spec = importlib.util.find_spec(module_name)
-            if spec is None or spec.loader is None:
-                raise ImportError(f"Module not found: {module_name}")
-
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            # Direct import using __import__
+            module = __import__(module_name, fromlist=[''])
 
             skill_class = None
             for name, obj in inspect.getmembers(module):
@@ -123,12 +118,24 @@ class SkillRegistry:
             self.logger.info(f"  ✓ {skill_class.__name__} ({len(skill_instance.get_intents())} intents)")
 
         except ImportError as e:
-            raise ImportError(f"Failed to import: {str(e)}")
+            # Enhanced error message to show the actual missing import
+            error_msg = str(e)
+            if "No module named 'sebas." in error_msg:
+                # Extract the problematic import
+                problematic = error_msg.split("'")[1]
+                standard_lib = problematic.replace('sebas.', '')
+                raise ImportError(
+                    f"Skill incorrectly imports '{problematic}' - should be '{standard_lib}' (standard library)"
+                )
+            raise ImportError(f"Failed to import: {error_msg}")
         except AttributeError as e:
             raise AttributeError(f"Missing attribute: {str(e)}")
         except Exception as e:
+            # Log full traceback for debugging
+            import traceback
+            self.logger.debug(f"Full traceback for {module_name}:\n{traceback.format_exc()}")
             raise Exception(f"Initialization failed: {str(e)}")
-
+    
     def get_skill_for_intent(self, intent: str) -> Optional[BaseSkill]:
         """Find a skill that can handle the given intent."""
         for skill in self.skills:

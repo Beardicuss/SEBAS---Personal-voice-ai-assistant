@@ -10,7 +10,7 @@ import platform
 import socket
 import shlex
 from typing import Optional, Dict, List, Tuple, Any
-from sebas.enum import Enum
+from enum import Enum
 
 
 class IPConfigType(Enum):

@@ -9,8 +9,8 @@ import subprocess
 import platform
 import psutil
 from typing import Optional, Dict, List, Tuple, Any
-from sebas.enum import Enum
-from sebas.datetime import datetime
+from enum import Enum
+from datetime import datetime
 
 
 class ThreatLevel(Enum):

@@ -7,10 +7,10 @@ Enterprise-grade activity logging, audit trails, and compliance reporting
 import logging
 import json
 import os
+from pathlib import Path
 from sebas.skills.base_skill import BaseSkill
-from sebas.typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
-from sebas.pathlib import Path
 
 
 class ComplianceSkill(BaseSkill):

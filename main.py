@@ -11,6 +11,7 @@ import sys
 import os
 
 # === Core Services ===
+from sebas.integrations.event_system import LearningSystem
 from sebas.permissions.permission_manager import PermissionManager
 from sebas.services.language_manager import LanguageManager
 from sebas.services.skill_registry import SkillRegistry
@@ -34,7 +35,6 @@ from sebas.events.event_bus import EventBus
 from sebas.constants.permissions import Role, is_authorized
 
 # === Learning System ===
-from sebas.integrations.learning_system import LearningSystem, LearningNLU
 from sebas.integrations.learning_integration import (
     LearningSEBASIntegration,
     VoiceLearningHelper,
@@ -73,6 +73,7 @@ class Sebas:
         self.permission_manager = PermissionManager()
         self.user_role = Role.ADMIN_OWNER  # Full access for owner
 
+        self.learning = LearningSystem();
         # --------------------------------------------------
         # NLU + Context Memory
         # --------------------------------------------------
@@ -106,14 +107,15 @@ class Sebas:
         # --------------------------------------------------
         try:
             logging.info("[SEBAS] Initializing learning system...")
-            self.learning = LearningSystem()
             
             # Wrap existing NLU with learning capabilities
             original_nlu = self.nlu
-            self.nlu = LearningNLU(original_nlu, self.learning)
             
             # Create learning integrations
-            self.learning_integration = LearningSEBASIntegration(self.learning, self)
+            self.learning_integration = LearningSEBASIntegration(
+                learning_system=self.learning,
+                sebas_instance=self
+            )
             self.voice_learning = VoiceLearningHelper(self.learning)
             self.command_history = CommandHistory(max_history=100)
             
@@ -207,7 +209,7 @@ class Sebas:
     # ========================================================
     #           Command Parsing + Intent Handling
     # ========================================================
-    def parse_and_execute(self, raw_command: str, source: str = 'voice') -> str:
+    def parse_and_execute(self, raw_command: str) -> str:
         """
         NLU pipeline with event hooks and learning support.
         Returns response message for UI/API.
@@ -243,11 +245,12 @@ class Sebas:
             # Use learning-enhanced NLU if available
             if hasattr(self.nlu, 'parse'):
                 # LearningNLU accepts source parameter
-                if isinstance(self.nlu, LearningNLU):
-                    intent = self.nlu.parse(command, source=source)
-                else:
-                    # Basic NLU doesn't accept source
-                    intent = self.nlu.parse(command)
+                # if isinstance(self.nlu, LearningNLU):
+                #     intent = self.nlu.parse(command)
+                # else:
+                #     # Basic NLU doesn't accept source
+                #     intent = self.nlu.parse(command)
+                intent = self.nlu.parse(command)
             elif hasattr(self.nlu, 'get_intent_with_confidence'):
                 # Fallback to basic NLU
                 intent, suggestions = self.nlu.get_intent_with_confidence(command)
@@ -261,7 +264,7 @@ class Sebas:
             
             # Track failed command for learning
             if hasattr(self, 'command_history'):
-                self.command_history.add(command, None, source, False)
+                self.command_history.add(command, None, False)
             
             msg = "I did not understand, sir. You can teach me by saying: 'this means' followed by the intent name."
             self.speak(msg)
@@ -317,7 +320,7 @@ class Sebas:
             
             # Track in command history
             if hasattr(self, 'command_history'):
-                self.command_history.add(command, intent.name, source, handled)
+                self.command_history.add(command, intent.name, handled)
             
             if handled:
                 self.events.emit("core.intent_handled", intent)

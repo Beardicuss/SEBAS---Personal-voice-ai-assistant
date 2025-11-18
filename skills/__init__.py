@@ -6,8 +6,8 @@ Stage 1 Mk.I + Stage 2 Enhanced
 
 import os
 import logging
-import threading
 from pathlib import Path
+import threading
 
 # Import base skill class
 from sebas.skills.base_skill import BaseSkill

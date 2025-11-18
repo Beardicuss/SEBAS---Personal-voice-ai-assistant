@@ -21,7 +21,7 @@ area. Implementors can plug in official SDK calls where indicated.
 import os
 import io
 import zipfile
-from sebas.pathlib import Path
+from pathlib import Path
 from typing import Optional, Tuple, Dict
 
 

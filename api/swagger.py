@@ -4,7 +4,7 @@ OpenAPI/Swagger Documentation
 Phase 1.3.6: API Documentation
 """
 
-from sebas.flask import Blueprint, jsonify
+from flask import Blueprint, jsonify
 from typing import Dict, Any
 
 

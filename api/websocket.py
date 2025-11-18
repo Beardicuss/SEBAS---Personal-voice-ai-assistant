@@ -8,15 +8,15 @@ import json
 import logging
 import threading
 from typing import Dict, Set, Callable, Optional, Any
-from sebas.enum import Enum
+from enum import Enum
 
 # Optional WebSocket support
 try:
-    from sebas.flask_socketio import SocketIO, emit, join_room, leave_room
+    from flask_socketio import SocketIO, emit, join_room, leave_room
     WEBSOCKET_AVAILABLE = True
 except ImportError:
     try:
-        from sebas.flask_socketio import SocketIO, emit, join_room, leave_room
+        from flask_socketio import SocketIO, emit, join_room, leave_room
         WEBSOCKET_AVAILABLE = True
     except ImportError:
         WEBSOCKET_AVAILABLE = False

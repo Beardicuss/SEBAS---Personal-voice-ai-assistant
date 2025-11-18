@@ -41,13 +41,10 @@ class NLUSkill(BaseSkill):
         """Initialize NLU components."""
         try:
             from sebas.integrations.nlu_enhancer import (
-                ContextManager, MultiPartCommandParser,
-                LearningSystem, IntentResolver
+                ContextManager
             )
             self.context_manager = ContextManager()
-            self.multipart_parser = MultiPartCommandParser()
-            self.learning_system = LearningSystem()
-            self.intent_resolver = IntentResolver()
+
         except Exception:
             logging.exception("Failed to initialize NLU components")
     
