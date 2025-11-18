@@ -1,8 +1,8 @@
 {
   "dataset": "john",
   "audio": {
-    "sample_rate": 22050,
-    "quality": "medium"
+    "sample_rate": 17000,
+    "quality": "high"
   },
   "espeak": {
     "voice": "en"
@@ -16,9 +16,9 @@
     "country_english": "United States"
   },
   "inference": {
-    "noise_scale": 0.85,
-    "length_scale": 0.92,
-    "noise_w": 1.2
+    "noise_scale": 1.0,
+    "length_scale": 0.9,
+    "noise_w": 0
   },
   "phoneme_type": "espeak",
   "phoneme_map": {},
