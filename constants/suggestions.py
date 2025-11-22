@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from sebas.typing import List, Dict
-from sebas.datetime import datetime
+from typing import List, Dict
+from datetime import datetime
 
 
 class SuggestionEngine:

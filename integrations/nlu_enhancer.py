@@ -7,9 +7,9 @@ Phase 6.2: Complex command parsing and context awareness
 import logging
 import json
 import os
-from sebas.typing import Dict, List, Optional, Any, Tuple
-from sebas.datetime import datetime
-from sebas.collections import defaultdict
+from typing import Dict, List, Optional, Any, Tuple
+from datetime import datetime
+from collections import defaultdict
 import re
 
 

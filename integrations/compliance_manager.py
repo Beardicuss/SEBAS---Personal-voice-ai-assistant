@@ -2,48 +2,71 @@
 """
 Compliance Manager Stub
 Phase 4.2 Compatibility Layer
-This provides dummy implementations so the assistant can run without backend integrations.
+Provides dummy implementations so ComplianceSkill can load without backend.
 """
 
 import os
 import logging
-from sebas.typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List
+from datetime import datetime
 
 
 class ComplianceManager:
-    def __init__(self, audit_log_path: str = "logs/audit.log"):
-        """Initialize a stub compliance manager."""
-        self.audit_log_path = audit_log_path
+    """Stub compliance manager for Stage 2."""
+    
+    def __init__(self, service_client=None):
+        """
+        Initialize stub compliance manager.
+        
+        Args:
+            service_client: Optional service client (ignored in stub)
+        """
+        self.audit_log_path = os.path.join(
+            os.path.expanduser('~'), 
+            '.sebas', 
+            'audit', 
+            'audit.log'
+        )
 
         try:
             os.makedirs(os.path.dirname(self.audit_log_path), exist_ok=True)
         except Exception:
             logging.warning(f"Could not create directory for {self.audit_log_path}")
 
-        logging.info(f"ComplianceManager initialized (stub) with log path: {self.audit_log_path}")
+        logging.info(f"ComplianceManager initialized (stub) with log: {self.audit_log_path}")
 
     # === Activity logging === #
 
     def log_activity(self, **kwargs) -> bool:
-        """Simulate logging an activity."""
+        """Log an activity to audit log."""
         try:
-            msg = f"[LOG] {kwargs.get('user', 'unknown')} -> {kwargs.get('action', 'no_action')} ({kwargs.get('status', 'ok')})"
+            timestamp = datetime.now().isoformat()
+            user = kwargs.get('user', 'unknown')
+            action = kwargs.get('action', 'no_action')
+            status = kwargs.get('status', 'ok')
+            
+            msg = f"[{timestamp}] {user} -> {action} (status: {status})"
+            
             with open(self.audit_log_path, "a", encoding="utf-8") as f:
                 f.write(msg + "\n")
-            logging.info(msg)
+            
+            logging.debug(f"Activity logged: {msg}")
             return True
         except Exception as e:
             logging.exception(f"Failed to write activity log: {e}")
             return False
 
     def get_activity_log(self, **kwargs) -> List[Dict[str, Any]]:
-        """Return mock activity logs."""
+        """Return recent activity logs."""
         try:
             if not os.path.exists(self.audit_log_path):
                 return []
+            
             with open(self.audit_log_path, "r", encoding="utf-8") as f:
                 lines = f.readlines()
-            return [{"line": line.strip()} for line in lines[-50:]]  # last 50 entries
+            
+            # Return last 50 entries
+            return [{"line": line.strip()} for line in lines[-50:]]
         except Exception:
             logging.exception("Failed to read activity log")
             return []
@@ -53,8 +76,18 @@ class ComplianceManager:
     def get_audit_events(self, **kwargs) -> List[Dict[str, Any]]:
         """Return dummy audit event data."""
         return [
-            {"event_type": "login", "category": "access", "severity": "low"},
-            {"event_type": "file_delete", "category": "filesystem", "severity": "medium"}
+            {
+                "event_type": "login",
+                "category": "access",
+                "severity": "low",
+                "timestamp": datetime.now().isoformat()
+            },
+            {
+                "event_type": "command_executed",
+                "category": "system",
+                "severity": "info",
+                "timestamp": datetime.now().isoformat()
+            }
         ]
 
     # === Compliance Reports === #
@@ -62,11 +95,18 @@ class ComplianceManager:
     def generate_compliance_report(self, **kwargs) -> Dict[str, Any]:
         """Generate a dummy compliance report."""
         return {
+            "generated_at": datetime.now().isoformat(),
             "activity_summary": {
                 "total_activities": 42,
-                "success_rate": 97.5
+                "success_rate": 97.5,
+                "period": "last_30_days"
             },
-            "compliance_status": "compliant"
+            "compliance_status": "compliant",
+            "findings": [],
+            "recommendations": [
+                "Continue monitoring system access",
+                "Review audit logs weekly"
+            ]
         }
 
     # === Security Policy Verification === #
@@ -75,7 +115,32 @@ class ComplianceManager:
         """Simulate a policy verification run."""
         return {
             "compliance_status": "compliant",
+            "checks_performed": [
+                "UAC enabled",
+                "Firewall active",
+                "Defender running",
+                "Auto-update enabled",
+                "Guest account disabled"
+            ],
             "passed": 5,
             "failed": 0,
-            "warnings": 1
+            "warnings": 0,
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    # === Compliance Check === #
+    
+    def run_compliance_check(self, **kwargs) -> Dict[str, Any]:
+        """Run a comprehensive compliance check."""
+        return {
+            "overall_status": "compliant",
+            "score": 95,
+            "checks": {
+                "uac": {"status": "pass", "details": "UAC is enabled"},
+                "firewall": {"status": "pass", "details": "Firewall is active"},
+                "defender": {"status": "pass", "details": "Defender is running"},
+                "updates": {"status": "pass", "details": "Auto-update enabled"},
+                "guest": {"status": "pass", "details": "Guest account disabled"}
+            },
+            "timestamp": datetime.now().isoformat()
         }

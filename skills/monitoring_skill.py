@@ -1,17 +1,16 @@
-# -*- coding: utf-8 -*-
 """
-MonitoringSkill
+MonitoringSkill - FIXED
 
-This skill provides real-time system monitoring and diagnostics,
-addressing Phase 1.2 of the Sebas Evolution Plan.
+This skill provides real-time system monitoring and diagnostics.
+Fixed: Removed dependency on prefs attribute
 """
 
 import os
 import psutil
 import logging
 import time
-from sebas.typing import Optional
-from .base_skill import BaseSkill
+from typing import Optional
+from sebas.skills.base_skill import BaseSkill
 
 class MonitoringSkill(BaseSkill):
     """
@@ -30,7 +29,14 @@ class MonitoringSkill(BaseSkill):
             'analyze_startup_impact',
             'disable_startup_item'
         ]
-        self.disk_space_threshold = self.assistant.prefs.get_pref('disk_space_threshold_percent', 85.0)
+        
+        # FIX: Check if assistant has prefs attribute
+        if hasattr(assistant, 'prefs'):
+            self.disk_space_threshold = assistant.prefs.get_pref('disk_space_threshold_percent', 85.0)
+        else:
+            # Default value if prefs not available
+            self.disk_space_threshold = 85.0
+            
         # Cache for startup items
         self.startup_items_cache = []
 
@@ -57,7 +63,11 @@ class MonitoringSkill(BaseSkill):
             self.check_disk_space()
             return True
         if intent == 'run_disk_cleanup':
-            self.assistant.run_disk_cleanup()
+            # FIX: Check if method exists
+            if hasattr(self.assistant, 'run_disk_cleanup'):
+                self.assistant.run_disk_cleanup()
+            else:
+                self.assistant.speak("Disk cleanup is not available")
             return True
         if intent == 'check_memory_leaks':
             self.check_memory_leaks()
@@ -68,7 +78,7 @@ class MonitoringSkill(BaseSkill):
         if intent == 'disable_startup_item':
             item_name = slots.get('item_name')
             if item_name is None:
-                self.assistant.speak("Please specify which startup log item to disable.")
+                self.assistant.speak("Please specify which startup item to disable.")
                 return False
             self.disable_startup_item(item_name)
             return True
@@ -130,7 +140,6 @@ class MonitoringSkill(BaseSkill):
                 return
 
             # Prioritize coretemp for CPU, then find the first available reading
-            # This is a common pattern as psutil returns a dict of lists of sensor readings
             cpu_temps = temps.get('coretemp', [])
             if cpu_temps:
                 avg_temp = sum(t.current for t in cpu_temps) / len(cpu_temps)
@@ -160,7 +169,6 @@ class MonitoringSkill(BaseSkill):
             
             if usage.percent > self.disk_space_threshold:
                 self.assistant.speak("Disk space is running low. Would you like me to run a disk cleanup?")
-                # The user can then say "yes" or "run disk cleanup"
 
         except Exception:
             logging.exception("Failed to check disk space.")
@@ -169,7 +177,6 @@ class MonitoringSkill(BaseSkill):
     def check_memory_leaks(self, duration_seconds=30, growth_threshold_mb=50):
         """
         Monitors processes for a short duration to detect potential memory leaks.
-        A "leak" is defined as significant memory growth over the sampling period.
         """
         self.assistant.speak(f"I will monitor system memory for {duration_seconds} seconds to detect potential leaks. Please wait.")
         
@@ -204,10 +211,14 @@ class MonitoringSkill(BaseSkill):
             top_leaker = leaky_processes[0]
             self.assistant.speak(f"The process '{top_leaker['name']}' has grown by {top_leaker['growth_mb']:.0f} megabytes. This could indicate a memory leak.")
             
-            if self.assistant.confirm_action(f"Would you like me to terminate the '{top_leaker['name']}' process?"):
-                self.assistant.kill_process(str(top_leaker['pid']))
+            # FIX: Check if methods exist
+            if hasattr(self.assistant, 'confirm_action') and hasattr(self.assistant, 'kill_process'):
+                if self.assistant.confirm_action(f"Would you like me to terminate the '{top_leaker['name']}' process?"):
+                    self.assistant.kill_process(str(top_leaker['pid']))
+                else:
+                    self.assistant.speak("Very well. I will not terminate the process.")
             else:
-                self.assistant.speak("Very well. I will not terminate the process.")
+                self.assistant.speak("Process termination is not available.")
 
         except Exception:
             logging.exception("Failed to check for memory leaks.")
@@ -216,6 +227,12 @@ class MonitoringSkill(BaseSkill):
     def analyze_startup_impact(self):
         """Analyzes and lists applications that run on startup."""
         self.assistant.speak("Analyzing startup applications. This may take a moment.")
+        
+        # FIX: Check if service_client exists
+        if not hasattr(self.assistant, 'service_client'):
+            self.assistant.speak("Startup analysis is not available in this configuration.")
+            return
+        
         success, response = self.assistant.service_client.send_command('get_startup_items')
 
         if not success:
@@ -230,7 +247,6 @@ class MonitoringSkill(BaseSkill):
             return
 
         item_names = [item['name'] for item in items]
-        # Speak only the top few for brevity
         spoken_items = item_names[:5]
         
         self.assistant.speak(f"I found {len(item_names)} startup items. Some of them are: {', '.join(spoken_items)}.")
@@ -246,6 +262,11 @@ class MonitoringSkill(BaseSkill):
 
         if not item_to_disable:
             self.assistant.speak(f"I could not find a startup item named '{item_name}'. Please run the startup analysis again.")
+            return
+
+        # FIX: Check if methods exist
+        if not hasattr(self.assistant, 'confirm_action') or not hasattr(self.assistant, 'service_client'):
+            self.assistant.speak("Startup item management is not available in this configuration.")
             return
 
         if self.assistant.confirm_action(f"Are you sure you want to disable {item_to_disable['name']} from starting up?"):

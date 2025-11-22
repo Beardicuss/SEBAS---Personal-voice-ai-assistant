@@ -7,9 +7,9 @@ Phase 6.1: Predictive Analytics and Anomaly Detection
 import logging
 import psutil
 import statistics
-from sebas.typing import Dict, List, Optional, Any, Tuple
-from sebas.datetime import datetime, timedelta
-from sebas.collections import deque
+from typing import Dict, List, Optional, Any, Tuple
+from datetime import datetime, timedelta
+from collections import deque
 import json
 import os
 

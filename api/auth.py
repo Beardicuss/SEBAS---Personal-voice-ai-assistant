@@ -7,9 +7,9 @@ import os
 import secrets
 import time
 import logging
-from sebas.typing import Optional, Dict, Callable
-from sebas.functools import wraps
-from sebas.flask import request, jsonify, g
+from typing import Optional, Dict, Callable
+from functools import wraps
+from flask import request, jsonify, g
 
 # Optional JWT support
 try:

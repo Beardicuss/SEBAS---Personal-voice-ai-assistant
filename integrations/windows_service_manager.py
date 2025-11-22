@@ -8,8 +8,8 @@ import subprocess
 import platform
 import shlex
 import ctypes
-from sebas.typing import Optional, Dict, List, Tuple
-from sebas.enum import Enum
+from typing import Optional, Dict, List, Tuple
+from enum import Enum
 
 
 class ServiceState(Enum):

@@ -1,0 +1,369 @@
+{
+  "corrections": {},
+  "custom_patterns": {
+    "set_volume": {
+      "patterns": [
+        "change\\ volume\\ 50\\."
+      ],
+      "semantic_anchors": [
+        "change volume 50."
+      ],
+      "confidence_threshold": 0.7
+    },
+    "open_application": {
+      "patterns": [
+        ",\\ open\\ note\\ cut\\."
+      ],
+      "semantic_anchors": [
+        ", open note cut."
+      ],
+      "confidence_threshold": 0.7
+    },
+    "switch_personality": {
+      "patterns": [
+        "change\\ personality\\ to\\ conversation\\."
+      ],
+      "semantic_anchors": [
+        "change personality to conversation."
+      ],
+      "confidence_threshold": 0.7
+    }
+  },
+  "workflows": {},
+  "usage_stats": {
+    "set_volume": {
+      "total_uses": 1,
+      "successful": 1,
+      "failed": 0,
+      "avg_confidence": 0.95,
+      "last_used": "2025-11-23T01:23:01.305545",
+      "common_slots": {
+        "level": {
+          "50": 1
+        }
+      }
+    },
+    "switch_personality": {
+      "total_uses": 2,
+      "successful": 1,
+      "failed": 1,
+      "avg_confidence": 0.95,
+      "last_used": "2025-11-23T01:54:45.411488",
+      "common_slots": {
+        "mode": {
+          "conversation": 2
+        }
+      }
+    },
+    "open_application": {
+      "total_uses": 1,
+      "successful": 1,
+      "failed": 0,
+      "avg_confidence": 0.95,
+      "last_used": "2025-11-23T01:34:49.112256",
+      "common_slots": {
+        "app_name": {
+          "note cut": 1
+        }
+      }
+    }
+  },
+  "context_patterns": {
+    "night": {
+      "common_intents": {
+        "set_volume": 1,
+        "switch_personality": 2,
+        "open_application": 1
+      },
+      "sequence": [
+        {
+          "intent": "set_volume",
+          "time": "2025-11-23T01:23:01.347352"
+        },
+        {
+          "intent": "switch_personality",
+          "time": "2025-11-23T01:34:02.334612"
+        },
+        {
+          "intent": "open_application",
+          "time": "2025-11-23T01:34:49.165066"
+        },
+        {
+          "intent": "switch_personality",
+          "time": "2025-11-23T01:54:45.448844"
+        }
+      ]
+    }
+  },
+  "parameter_memory": {
+    "level": {
+      "50": {
+        "count": 1,
+        "intents": [
+          "set_volume"
+        ],
+        "metadata": {}
+      }
+    },
+    "app_name": {
+      "note cut": {
+        "count": 1,
+        "intents": [
+          "open_application"
+        ],
+        "metadata": {}
+      }
+    },
+    "mode": {
+      "conversation": {
+        "count": 1,
+        "intents": [
+          "switch_personality"
+        ],
+        "metadata": {}
+      }
+    }
+  },
+  "semantic_clusters": {
+    "cb9a49a1": {
+      "anchor": "change volume 50.",
+      "members": [
+        "change volume 50."
+      ],
+      "intent": "set_volume"
+    },
+    "974bfcf7": {
+      "anchor": ", open note cut.",
+      "members": [
+        ", open note cut."
+      ],
+      "intent": "open_application"
+    },
+    "615c235c": {
+      "anchor": "change personality to conversation.",
+      "members": [
+        "change personality to conversation."
+      ],
+      "intent": "switch_personality"
+    }
+  },
+  "bayesian_priors": {
+    "intent_success_rate": {
+      "set_volume": {
+        "successes": 1,
+        "failures": 0
+      },
+      "switch_personality": {
+        "successes": 1,
+        "failures": 1
+      },
+      "open_application": {
+        "successes": 1,
+        "failures": 0
+      }
+    },
+    "pattern_accuracy": {},
+    "total_interactions": 4
+  },
+  "ngram_patterns": {
+    "unigrams": {
+      "change": {
+        "count": 2,
+        "intents": {
+          "set_volume": 1,
+          "switch_personality": 1
+        }
+      },
+      "volume": {
+        "count": 1,
+        "intents": {
+          "set_volume": 1
+        }
+      },
+      "50": {
+        "count": 1,
+        "intents": {
+          "set_volume": 1
+        }
+      },
+      "open": {
+        "count": 1,
+        "intents": {
+          "open_application": 1
+        }
+      },
+      "note": {
+        "count": 1,
+        "intents": {
+          "open_application": 1
+        }
+      },
+      "cut": {
+        "count": 1,
+        "intents": {
+          "open_application": 1
+        }
+      },
+      "personality": {
+        "count": 1,
+        "intents": {
+          "switch_personality": 1
+        }
+      },
+      "to": {
+        "count": 1,
+        "intents": {
+          "switch_personality": 1
+        }
+      },
+      "conversation": {
+        "count": 1,
+        "intents": {
+          "switch_personality": 1
+        }
+      }
+    },
+    "bigrams": {
+      "change volume": {
+        "count": 1,
+        "intents": {
+          "set_volume": 1
+        }
+      },
+      "volume 50": {
+        "count": 1,
+        "intents": {
+          "set_volume": 1
+        }
+      },
+      "open note": {
+        "count": 1,
+        "intents": {
+          "open_application": 1
+        }
+      },
+      "note cut": {
+        "count": 1,
+        "intents": {
+          "open_application": 1
+        }
+      },
+      "change personality": {
+        "count": 1,
+        "intents": {
+          "switch_personality": 1
+        }
+      },
+      "personality to": {
+        "count": 1,
+        "intents": {
+          "switch_personality": 1
+        }
+      },
+      "to conversation": {
+        "count": 1,
+        "intents": {
+          "switch_personality": 1
+        }
+      }
+    },
+    "trigrams": {
+      "change volume 50": {
+        "count": 1,
+        "intents": {
+          "set_volume": 1
+        }
+      },
+      "open note cut": {
+        "count": 1,
+        "intents": {
+          "open_application": 1
+        }
+      },
+      "change personality to": {
+        "count": 1,
+        "intents": {
+          "switch_personality": 1
+        }
+      },
+      "personality to conversation": {
+        "count": 1,
+        "intents": {
+          "switch_personality": 1
+        }
+      }
+    },
+    "intent_ngrams": {}
+  },
+  "temporal_patterns": {
+    "hourly": {
+      "1": {
+        "set_volume": 1,
+        "switch_personality": 2,
+        "open_application": 1
+      }
+    },
+    "daily": {
+      "Sunday": {
+        "set_volume": 1,
+        "switch_personality": 2,
+        "open_application": 1
+      }
+    },
+    "monthly": {
+      "11": {
+        "set_volume": 1,
+        "switch_personality": 2,
+        "open_application": 1
+      }
+    },
+    "seasonal": {
+      "fall": {
+        "set_volume": 1,
+        "switch_personality": 2,
+        "open_application": 1
+      }
+    },
+    "work_hours": {
+      "leisure_hours": {
+        "set_volume": 1,
+        "switch_personality": 2,
+        "open_application": 1
+      }
+    },
+    "sequences": [
+      {
+        "intent": "set_volume",
+        "timestamp": "2025-11-23T01:23:01.358455",
+        "hour": 1,
+        "day": "Sunday"
+      },
+      {
+        "intent": "switch_personality",
+        "timestamp": "2025-11-23T01:34:02.335304",
+        "hour": 1,
+        "day": "Sunday"
+      },
+      {
+        "intent": "open_application",
+        "timestamp": "2025-11-23T01:34:49.177442",
+        "hour": 1,
+        "day": "Sunday"
+      },
+      {
+        "intent": "switch_personality",
+        "timestamp": "2025-11-23T01:54:45.464592",
+        "hour": 1,
+        "day": "Sunday"
+      }
+    ]
+  },
+  "dependency_graph": {
+    "edges": {
+      "switch_personality": {
+        "open_application": 1
+      }
+    },
+    "chains": []
+  }
+}

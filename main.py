@@ -1,7 +1,6 @@
 """
-SEBAS CORE MAIN CONTROLLER – Stage 1 Mk.I ENHANCED
-Clean, modular, stable architecture for voice assistant.
-Unicode-safe logging for Windows.
+SEBAS CORE MAIN CONTROLLER – Stage 2 Mk.II with Self-Learning & Personality
+Ultra-advanced local learning system + personality engine integrated
 """
 
 import logging
@@ -32,6 +31,13 @@ from sebas.events.event_bus import EventBus
 # === Permissions ===
 from sebas.constants.permissions import Role, is_authorized
 
+# === Preferences ===
+from sebas.constants.preferences import PreferenceStore
+
+# === Self-Learning System ===
+from sebas.learning.memory_store import MemoryStore
+from sebas.learning.learning_manager import LearningManager
+
 
 # ============================================================
 #                       SEBAS CORE
@@ -42,10 +48,11 @@ class Sebas:
     Central brain of the assistant.
     Handles the flow:
         WakeWord → STT → NLU → Skills → TTS.
+    Now with self-learning and personality engine!
     """
 
     def __init__(self):
-        logging.info("[SEBAS] Initializing SEBAS Stage 1 Mk.I Enhanced...")
+        logging.info("[SEBAS] Initializing SEBAS Stage 2 Mk.II with Self-Learning & Personality...")
 
         # --------------------------------------------------
         # Global Event Bus
@@ -92,11 +99,42 @@ class Sebas:
         )
 
         # --------------------------------------------------
-        # Wake Word Detector
+        # Wake Word Detector (with 10-second timeout)
         # --------------------------------------------------
-        self.wakeword = WakeWordDetector(callback=self._on_wake_word)
+        self.wakeword = WakeWordDetector(
+            callback=self._on_wake_word,
+            timeout_seconds=10
+        )
 
-        logging.info("[SEBAS] Stage 1 fully initialized")
+        # --------------------------------------------------
+        # Self-Learning System 🧠
+        # --------------------------------------------------
+        try:
+            self.memory = MemoryStore(path="sebas/data/learning_memory.json")
+            self.learning = LearningManager(
+                nlu=self.nlu,
+                prefs=None,
+                memory_store=self.memory,
+                assistant_ref=self
+            )
+            logging.info("[SEBAS] ✓ Self-learning system initialized")
+        except Exception as e:
+            logging.error(f"[SEBAS] Failed to initialize self-learning: {e}")
+            self.learning = None
+
+        # --------------------------------------------------
+        # Personality Engine 🎭
+        # --------------------------------------------------
+        try:
+            from sebas.personality.persona_core import PersonalityEngine
+            self.persona = PersonalityEngine()
+            self.persona.set_mode("default")
+            logging.info("[SEBAS] ✓ Personality engine initialized")
+        except Exception as e:
+            logging.error(f"[SEBAS] Failed to initialize personality engine: {e}")
+            self.persona = None
+
+        logging.info("[SEBAS] Stage 2 fully initialized with self-learning & personality")
 
         # Emit startup event
         self.events.emit("core.started", None)
@@ -132,33 +170,28 @@ class Sebas:
     def _on_wake_word(self, detected_text=None):
         """
         Triggered when wake word is detected.
-        
-        Args:
-            detected_text: The full text that was recognized (e.g., "sebas open notepad")
+        Handles both initial wake word and commands during listening window.
         """
-        logging.info(f"[WakeWord] Detected! Text: '{detected_text}'")
+        logging.info(f"[WakeWord] Callback triggered with: '{detected_text}'")
         self.events.emit("core.wake_word_detected", detected_text)
+
+        # Special timeout message
+        if detected_text == "__TIMEOUT__":
+            self.speak("Speak, fool.")
+            return
+
+        # Empty string means just wake word, no command yet
+        if detected_text == "":
+            self.speak("Yes, sir? I'm listening.")
+            return
         
-        # Check if command was included in the wake word detection
-        if detected_text and isinstance(detected_text, str):
-            # Remove the wake word from the text to extract the command
-            keyword = self.wakeword.keyword
-            detected_lower = detected_text.lower()
-            
-            if keyword in detected_lower:
-                # Extract command after wake word
-                # e.g., "sebas open notepad" -> "open notepad"
-                parts = detected_lower.split(keyword, 1)
-                if len(parts) > 1:
-                    command = parts[1].strip()
-                    if command:
-                        logging.info(f"[WakeWord] Command detected in wake phrase: '{command}'")
-                        self.speak("Yes, sir?")
-                        # Execute the command directly
-                        self.parse_and_execute(command)
-                        return
+        # If we got a command, execute it
+        if detected_text and isinstance(detected_text, str) and detected_text.strip():
+            command = detected_text.strip()
+            self.parse_and_execute(command)
+            return
         
-        # No command detected, ask for one
+        # Fallback: ask for command (shouldn't reach here normally)
         self.speak("Yes, sir?")
         command = self.listen()
         if command:
@@ -169,7 +202,7 @@ class Sebas:
     # ========================================================
     def parse_and_execute(self, raw_command: str) -> str:
         """
-        NLU pipeline with event hooks.
+        NLU pipeline with event hooks and self-learning.
         Returns response message for UI/API.
         """
         if not raw_command:
@@ -228,6 +261,19 @@ class Sebas:
         # -------- Dispatch to Skills --------
         handled = self.skill_registry.handle_intent(intent.name, intent.slots)
 
+        # -------- Learn from this interaction 🧠 --------
+        if self.learning:
+            try:
+                self.learning.save_after_interaction(
+                    text=command,
+                    intent=intent.name,
+                    slots=intent.slots,
+                    success=handled,
+                    confidence=intent.confidence
+                )
+            except Exception as e:
+                logging.error(f"[SEBAS] Learning error: {e}")
+
         if handled:
             self.events.emit("core.intent_handled", intent)
             return f"Command executed: {intent.name}"
@@ -242,7 +288,7 @@ class Sebas:
     # ========================================================
     def start(self):
         """Start wake word thread and speak greeting."""
-        self.speak("SEBAS Stage 1 online and awaiting your orders, sir.")
+        self.speak("MASTER SEBAS is online with self-learning enabled, sir.")
         self.wakeword.start()
         logging.info("[WakeWord] Detection started")
 
@@ -252,20 +298,20 @@ class Sebas:
 # ============================================================
 
 def main():
-    """Main entry point for SEBAS Stage 1."""
+    """Main entry point for SEBAS Stage 2."""
     
     # Setup logging with UTF-8 encoding support
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
         handlers=[
             logging.StreamHandler(sys.stdout),
-            logging.FileHandler('sebas_stage1.log', encoding='utf-8')
+            logging.FileHandler('sebas_stage2.log', encoding='utf-8')
         ]
     )
 
     logging.info("=" * 60)
-    logging.info("[SEBAS] Stage 1 Mk.I Enhanced - STARTING")
+    logging.info("[SEBAS] Stage 2 Mk.II with Self-Learning & Personality - STARTING")
     logging.info("=" * 60)
 
     try:
@@ -294,11 +340,28 @@ def main():
         
         time.sleep(0.5)
 
-        logging.info("[SEBAS] Stage 1 is RUNNING")
+        # Print status
+        status = assistant.skill_registry.get_skill_status()
+        logging.info("[SEBAS] Stage 2 is RUNNING with SELF-LEARNING")
+        logging.info(f"[INFO] Skills Loaded: {status['loaded']}")
+        logging.info(f"[INFO] Total Intents: {status['total_intents']}")
+        
+       # Learning stats
+        if assistant.learning:
+            stats = assistant.learning.get_stats_summary()
+            logging.info(f"[LEARNING] Total interactions: {stats.get('total_interactions', 0)}")
+            logging.info(f"[LEARNING] Corrections learned: {stats.get('corrections_learned', 0)}")
+            logging.info(f"[LEARNING] Custom patterns: {stats.get('custom_patterns', 0)}")
+            logging.info(f"[LEARNING] Workflows: {stats.get('workflows', 0)}")
+            logging.info(f"[LEARNING] Semantic clusters: {stats.get('semantic_clusters', 0)}")
+            
+            # Show most used intents
+            most_used = stats.get('most_used_intents', [])
+            if most_used:
+                logging.info(f"[LEARNING] Most used intents: {', '.join(most_used)}")
+        
         logging.info("[INFO] Open http://127.0.0.1:5000 in your browser")
-        logging.info("[INFO] Say 'SEBAS' followed by your command")
-        logging.info("[INFO] Example: 'SEBAS open notepad' or 'SEBAS what time is it'")
-        logging.info("[INFO] Or type commands in the web UI")
+        logging.info("[INFO] Say 'Master SEBAS' once, then give commands for 10 seconds")
         logging.info("Press Ctrl+C to exit")
 
         # Keep process alive
@@ -306,9 +369,9 @@ def main():
             time.sleep(1)
 
     except KeyboardInterrupt:
-        logging.info("\n[SEBAS] Shutting down Stage 1...")
+        logging.info("\n[SEBAS] Shutting down Stage 2...")
     except Exception as e:
-        logging.exception("[ERROR] FATAL ERROR in SEBAS Stage 1")
+        logging.exception("[ERROR] FATAL ERROR in SEBAS Stage 2")
         sys.exit(1)
 
 

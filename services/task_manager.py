@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
-from sebas.typing import List, Callable, Dict, Any, Optional
+from typing import List, Callable, Dict, Any, Optional
 
 
 class TaskManager:

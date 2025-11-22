@@ -2,12 +2,13 @@
 """
 Compliance Management Skill
 Phase 4.2: Compliance reporting and activity monitoring
+FIXED: Handle missing service_client gracefully
 """
 
 from sebas.skills.base_skill import BaseSkill
-from sebas.typing import Dict, Any
+from typing import Dict, Any
 import logging
-from sebas.datetime import datetime, timedelta
+from datetime import datetime, timedelta
 
 
 class ComplianceSkill(BaseSkill):
@@ -31,9 +32,31 @@ class ComplianceSkill(BaseSkill):
         """Initialize compliance manager."""
         try:
             from sebas.integrations.compliance_manager import ComplianceManager
-            self.compliance_manager = ComplianceManager(self.assistant.service_client)
-        except Exception:
-            logging.exception("Failed to initialize compliance manager")
+            
+            # Check if assistant has service_client attribute
+            service_client = getattr(self.assistant, 'service_client', None)
+            
+            if service_client is None:
+                logging.warning(
+                    "[ComplianceSkill] service_client not available on assistant. "
+                    "Compliance features will be limited. "
+                    "To enable full functionality, add service_client to your SEBAS instance."
+                )
+                # Initialize with None - ComplianceManager should handle this
+                self.compliance_manager = ComplianceManager(None)
+            else:
+                self.compliance_manager = ComplianceManager(service_client)
+                
+            logging.info("[ComplianceSkill] Compliance manager initialized")
+            
+        except ImportError:
+            logging.warning(
+                "[ComplianceSkill] ComplianceManager not found. "
+                "Compliance features are disabled."
+            )
+            self.compliance_manager = None
+        except Exception as e:
+            logging.error(f"[ComplianceSkill] Failed to initialize compliance manager: {e}")
             self.compliance_manager = None
     
     def can_handle(self, intent: str) -> bool:
@@ -44,7 +67,7 @@ class ComplianceSkill(BaseSkill):
     
     def handle(self, intent: str, slots: dict) -> bool:
         if not self.compliance_manager:
-            self.assistant.speak("Compliance management is not available")
+            self.assistant.speak("Compliance management is not available. Please check the logs.")
             return False
         
         if intent == 'log_activity':
@@ -77,10 +100,12 @@ class ComplianceSkill(BaseSkill):
                 status=status
             )
             
+            self.assistant.speak(f"Activity logged: {action} by {user}")
             return True
             
-        except Exception:
+        except Exception as e:
             logging.exception("Failed to log activity")
+            self.assistant.speak("Failed to log activity")
             return False
     
     def _handle_get_activity_log(self, slots: dict) -> bool:
@@ -110,7 +135,7 @@ class ComplianceSkill(BaseSkill):
             
             return True
             
-        except Exception:
+        except Exception as e:
             logging.exception("Failed to get activity log")
             self.assistant.speak("Failed to get activity log")
             return False
@@ -144,7 +169,7 @@ class ComplianceSkill(BaseSkill):
             
             return True
             
-        except Exception:
+        except Exception as e:
             logging.exception("Failed to get audit events")
             self.assistant.speak("Failed to get audit events")
             return False
@@ -179,7 +204,7 @@ class ComplianceSkill(BaseSkill):
             
             return report is not None
             
-        except Exception:
+        except Exception as e:
             logging.exception("Failed to generate compliance report")
             self.assistant.speak("Failed to generate compliance report")
             return False
@@ -207,7 +232,7 @@ class ComplianceSkill(BaseSkill):
             
             return results is not None
             
-        except Exception:
+        except Exception as e:
             logging.exception("Failed to verify security policy")
             self.assistant.speak("Failed to verify security policy")
             return False

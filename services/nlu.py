@@ -7,7 +7,6 @@ import re
 from dataclasses import dataclass
 from typing import Dict, Any, Optional, List, Tuple
 
-
 @dataclass
 class IntentBase:
     name: str
@@ -30,44 +29,46 @@ class SimpleNLU:
         # Pattern-based intents (regex patterns)
         self.patterns: List[Tuple[str, str, float]] = [
             # System commands
-            (r"shutdown|shut down|turn off( computer| pc)?", "shutdown_computer", 1.0),
-            (r"restart|reboot( computer| pc)?", "restart_computer", 1.0),
-            (r"sleep|hibernate", "sleep_computer", 0.9),
-            (r"lock( computer| screen)?", "lock_computer", 0.9),
+            (r"\b(?:shutdown|shut down|turn off)(?: computer| pc)?\b", "shutdown_computer", 1.0),
+            (r"\b(?:restart|reboot)(?: computer| pc)?\b", "restart_computer", 1.0),
+            (r"\b(?:sleep|hibernate)\b", "sleep_computer", 0.9),
+            (r"\block(?: computer| screen)?\b", "lock_computer", 0.9),
             
-            # Application control
-            (r"open ([a-z]+)", "open_application", 0.95),
-            (r"close ([a-z]+)", "close_application", 0.95),
-            (r"launch ([a-z]+)", "open_application", 0.9),
-            (r"start ([a-z]+)", "open_application", 0.9),
+            # Application control - FIXED: Match multi-word app names and single words
+            (r"\b(?:open|launch|start)(?: application)?\s+(.+?)(?:\.|$|,)", "open_application", 0.95),
+            (r"\bclose(?: application)?\s+(.+?)(?:\.|$|,)", "close_application", 0.95),
             
             # System info
-            (r"(get |show |what's )?(my )?ip( address)?", "get_ip_address", 0.95),
-            (r"(get |show |what's )?(the )?cpu( info| usage)?", "get_cpu_info", 0.9),
-            (r"(get |show |what's )?(the )?memory( info| usage)?", "get_memory_info", 0.9),
-            (r"system (status|health|info)", "get_system_status", 0.95),
-            (r"disk space", "check_disk_space", 0.95),
+            (r"(?:get |show |what'?s )?(?:my )?ip(?: address)?", "get_ip_address", 0.95),
+            (r"(?:get |show |what'?s )?(?:the )?cpu(?: info| usage)?", "get_cpu_info", 0.9),
+            (r"(?:get |show |what'?s )?(?:the )?memory(?: info| usage)?", "get_memory_info", 0.9),
+            (r"\bsystem (?:status|health|info)\b", "get_system_status", 0.95),
+            (r"\bdisk space\b", "check_disk_space", 0.95),
             
             # Network
-            (r"(run |do )?speed test", "run_speed_test", 0.95),
-            (r"test (network |internet )?connect(ion|ivity)?", "test_network_connectivity", 0.9),
-            (r"ping", "test_network_connectivity", 0.8),
+            (r"(?:run |do )?speed test", "run_speed_test", 0.95),
+            (r"\btest (?:network |internet )?connect(?:ion|ivity)?\b", "test_network_connectivity", 0.9),
+            (r"\bping\b", "test_network_connectivity", 0.8),
             
             # Volume
-            (r"(set |change )?volume( to)? (\d+)", "set_volume", 0.95),
-            (r"volume up", "set_volume", 0.9),
-            (r"volume down", "set_volume", 0.9),
-            (r"mute", "set_volume", 0.9),
+            (r"(?:set |change )?volume(?: to)?\s+(\d+)", "set_volume", 0.95),
+            (r"\bvolume up\b", "set_volume", 0.9),
+            (r"\bvolume down\b", "set_volume", 0.9),
+            (r"\bmute\b", "set_volume", 0.9),
             
             # Time/Date
-            (r"what('s| is) the time", "get_time", 1.0),
-            (r"what('s| is) (the )?date", "get_date", 1.0),
+            (r"\bwhat'?s?(?: is)? the time\b", "get_time", 1.0),
+            (r"\bwhat'?s?(?: is)? (?:the )?date\b", "get_date", 1.0),
+            
+            # Personality switching
+            (r"\b(?:personality|change personality|set personality|switch.*?personality).*?(default|conversation)", "switch_personality", 0.95),
+            (r"\b(default|conversation)\s+(?:mode|personality)", "switch_personality", 0.9),
+            (r"\benable\s+(default|conversation)", "switch_personality", 0.9),
             
             # File operations
-            (r"create folder (.+)", "create_folder", 0.95),
-            (r"delete (.+)", "delete_path", 0.9),
-            (r"search( for)? (.+)", "search_files", 0.85),
-            (r"find (.+)", "search_files", 0.85),
+            (r"\bcreate folder\s+(.+?)(?:\.|$)", "create_folder", 0.95),
+            (r"\bdelete\s+(.+?)(?:\.|$)", "delete_path", 0.9),
+            (r"\b(?:search|find)(?: for)?\s+(.+?)(?:\.|$)", "search_files", 0.85),
         ]
         
         # Keyword-based fallback (when patterns don't match)
@@ -115,7 +116,10 @@ class SimpleNLU:
         if not text:
             return None, []
         
+        # Clean the text
         text_lower = text.lower().strip()
+        # Remove leading punctuation/fragments from wake word extraction issues
+        text_lower = re.sub(r'^[,\s\t]+', '', text_lower)
         
         # Try pattern matching first
         for pattern, intent_name, confidence in self.patterns:
@@ -153,31 +157,48 @@ class SimpleNLU:
         # Extract named groups
         if match.groups():
             if intent_name in ["open_application", "close_application"]:
-                slots["app_name"] = match.group(1)
+                app_name = match.group(1).strip()
+                # Remove trailing punctuation and extra whitespace
+                app_name = re.sub(r'[.\s]+$', '', app_name)
+                app_name = re.sub(r'\s+', ' ', app_name)
+                slots["app_name"] = app_name
             
             elif intent_name == "set_volume":
                 # Extract volume level
-                volume_match = re.search(r"(\d+)", text)
-                if volume_match:
-                    slots["level"] = int(volume_match.group(1))
-                elif "up" in text:
-                    slots["level"] = "+10"
-                elif "down" in text:
-                    slots["level"] = "-10"
-                elif "mute" in text:
-                    slots["level"] = 0
+                if match.lastindex and match.lastindex >= 1:
+                    try:
+                        slots["level"] = int(match.group(1))
+                    except (ValueError, IndexError):
+                        pass
+                
+                if "level" not in slots:
+                    if "up" in text:
+                        slots["level"] = "+10"
+                    elif "down" in text:
+                        slots["level"] = "-10"
+                    elif "mute" in text:
+                        slots["level"] = 0
             
-            elif intent_name in ["create_folder", "delete_path"]:
-                # Extract path (everything after the command)
-                path_match = re.search(r"(folder|delete) (.+)", text)
-                if path_match:
-                    slots["path"] = path_match.group(2).strip()
+            elif intent_name == "switch_personality":
+                # Extract personality mode (default or conversation)
+                if match.lastindex and match.lastindex >= 1:
+                    mode = match.group(1).strip()
+                    slots["mode"] = mode
+            
+            elif intent_name == "create_folder":
+                path = match.group(1).strip()
+                path = re.sub(r'[.\s]+$', '', path)
+                slots["path"] = path
+            
+            elif intent_name == "delete_path":
+                path = match.group(1).strip()
+                path = re.sub(r'[.\s]+$', '', path)
+                slots["path"] = path
             
             elif intent_name == "search_files":
-                # Extract search query
-                search_match = re.search(r"(search|find) (?:for )?(.+)", text)
-                if search_match:
-                    slots["query"] = search_match.group(2).strip()
+                query = match.group(1).strip()
+                query = re.sub(r'[.\s]+$', '', query)
+                slots["query"] = query
         
         return slots
     

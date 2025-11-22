@@ -9,8 +9,8 @@ import subprocess
 import platform
 import socket
 import shlex
-from sebas.typing import Optional, Dict, List, Tuple, Any
-from sebas.enum import Enum
+from typing import Optional, Dict, List, Tuple, Any
+from enum import Enum
 
 
 class IPConfigType(Enum):

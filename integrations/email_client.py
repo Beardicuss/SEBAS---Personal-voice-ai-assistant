@@ -16,7 +16,7 @@ import smtplib
 import email
 import logging
 from email.mime.text import MIMEText
-from sebas.typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional
 
 
 def _env_bool(name: str, default: bool = True) -> bool:

@@ -1,0 +1,13 @@
+{
+    "current_topic": null,
+    "topic_strength": 0,
+    "last_messages": [],
+    "user_emotion": "neutral",
+    "chaos_level": 3,
+    "silence_counter": 0,
+    "mentioned_lore": [],
+    "last_user_message": "",
+    "last_bot_message": "",
+    "conversation_count": 0,
+    "session_start": null
+}

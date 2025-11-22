@@ -1,163 +1,281 @@
 """
-Language Manager - FIXED
-Controls:
-    - Current system language
-    - Auto-detection from text
-    - Synchronization with STT and TTS modules
+Language Manager - Stage 1 Mk.I (Whisper Edition)
+Controls STT/TTS language switching for Whisper-based system
 """
 
-from pathlib import Path
 import re
 import logging
 
-# FIXED: Use actual available models and voices
+# Whisper supports 99 languages out of the box
 SUPPORTED_LANGS = {
     "en": {
         "name": "English",
-        "stt_model": "vosk-model-small-en-us-0.15",  # Actual model folder name
-        "tts_voice": "english",  # Generic voice hint that should match available voices
+        "whisper_code": "en",
+        "tts_voice": "english",
     },
     "ru": {
-        "name": "Russian", 
-        "stt_model": None,  # No Russian model available
-        "tts_voice": "russian",  # Voice hint
+        "name": "Russian",
+        "whisper_code": "ru",
+        "tts_voice": "russian",
     },
     "ja": {
         "name": "Japanese",
-        "stt_model": None,  # No Japanese model available  
-        "tts_voice": "japanese",  # Voice hint
+        "whisper_code": "ja",
+        "tts_voice": "japanese",
     },
     "ka": {
         "name": "Georgian",
-        "stt_model": None,  # No Georgian model available
-        "tts_voice": "georgian",  # Voice hint
-    }
+        "whisper_code": "ka",
+        "tts_voice": "georgian",
+    },
+    "es": {
+        "name": "Spanish",
+        "whisper_code": "es",
+        "tts_voice": "spanish",
+    },
+    "fr": {
+        "name": "French",
+        "whisper_code": "fr",
+        "tts_voice": "french",
+    },
+    "de": {
+        "name": "German",
+        "whisper_code": "de",
+        "tts_voice": "german",
+    },
+    "it": {
+        "name": "Italian",
+        "whisper_code": "it",
+        "tts_voice": "italian",
+    },
+    "pt": {
+        "name": "Portuguese",
+        "whisper_code": "pt",
+        "tts_voice": "portuguese",
+    },
+    "zh": {
+        "name": "Chinese",
+        "whisper_code": "zh",
+        "tts_voice": "chinese",
+    },
+    "ko": {
+        "name": "Korean",
+        "whisper_code": "ko",
+        "tts_voice": "korean",
+    },
+    "ar": {
+        "name": "Arabic",
+        "whisper_code": "ar",
+        "tts_voice": "arabic",
+    },
 }
 
 
 class LanguageManager:
     """
     Controls SEBAS language flow:
-        - STT → choose model
-        - TTS → choose voice
-        - NLU → normalize text
+        - STT → Whisper language
+        - TTS → Voice selection
+        - NLU → Text normalization
     """
 
-    def __init__(self, default_lang="en"):
+    def __init__(self, default_lang: str = "en"):
+        """
+        Initialize Language Manager.
+        
+        Args:
+            default_lang: Default language code (ISO 639-1)
+        """
         self.current_lang = default_lang
-        self.stt = None   # will be linked by main.py
-        self.tts = None   # will be linked by main.py
-        self.available_stt_models = {}  # Track which STT models are actually available
+        self.stt = None  # Will be linked by main.py
+        self.tts = None  # Will be linked by main.py
+        
+        logging.info(f"[LanguageManager] Initialized with default language: {default_lang}")
 
-    # ------------------------------------------------------------
-    # Linking engine managers (called from main.py)
-    # ------------------------------------------------------------
+    # ============================================================
+    # Binding STT/TTS Managers
+    # ============================================================
+    
     def bind_stt(self, stt_manager):
+        """
+        Bind STT manager.
+        
+        Args:
+            stt_manager: STTManager instance
+        """
         self.stt = stt_manager
-        self._discover_available_stt_models()
+        logging.info("[LanguageManager] STT manager bound")
+        
+        # Set initial language
+        if self.stt:
+            self._update_stt_language()
 
     def bind_tts(self, tts_manager):
+        """
+        Bind TTS manager.
+        
+        Args:
+            tts_manager: TTSManager instance
+        """
         self.tts = tts_manager
-
-    def _discover_available_stt_models(self):
-        """Discover which STT models are actually available"""
-        if not self.stt or self.stt.mode != "vosk":
-            return
-            
-        base_dir = Path(__file__).resolve().parent.parent
+        logging.info("[LanguageManager] TTS manager bound")
         
-        # Check for common Vosk model patterns
-        model_patterns = {
-            "en": ["vosk-model-small-en-us-0.15", "vosk-model-small-en-us", "vosk-model-en-us-0.22"],
-            "ru": ["vosk-model-small-ru-0.22", "vosk-model-ru-0.22"],
-            "ja": ["vosk-model-small-ja-0.22", "vosk-model-ja-0.22"],
-            "ka": ["vosk-model-small-ka-0.22", "vosk-model-ka-0.22"],
-        }
-        
-        for lang_code, patterns in model_patterns.items():
-            for pattern in patterns:
-                model_path = base_dir / "model" / pattern
-                if model_path.exists():
-                    self.available_stt_models[lang_code] = str(model_path)
-                    logging.info(f"LanguageManager: Found STT model for {lang_code}: {pattern}")
-                    break
-
-    # ------------------------------------------------------------
-    # Language detection
-    # ------------------------------------------------------------
-    def detect_language(self, text: str):
-        """Primitive detection. Replace with fastText later."""
-        if not text or not text.strip():
-            return self.set_language("en")
-            
-        t = text.lower()
-
-        if re.search(r"[а-яё]", t):
-            return self.set_language("ru")
-        if re.search(r"[ぁ-ゔァ-ヴ]", t):
-            return self.set_language("ja")
-        if re.search(r"მ|ქ|წ|ჭ|ღ", t):
-            return self.set_language("ka")
-
-        return self.set_language("en")
-
-    # ------------------------------------------------------------
-    # Set new language (full pipeline: STT+TTS switch)
-    # ------------------------------------------------------------
-    def set_language(self, lang_code: str) -> bool:
-        if lang_code not in SUPPORTED_LANGS:
-            logging.warning(f"LanguageManager: Unsupported language code: {lang_code}")
-            return False
-
-        old_lang = self.current_lang
-        self.current_lang = lang_code
-        profile = SUPPORTED_LANGS[lang_code]
-
-        logging.info(f"LanguageManager: Switching from {old_lang} to {lang_code}")
-
-        # Switch STT model only if available
-        if self.stt and profile["stt_model"]:
-            # Check if this model is actually available
-            stt_model_path = self.available_stt_models.get(lang_code)
-            if stt_model_path:
-                try:
-                    self.stt.set_language(stt_model_path)
-                    logging.info(f"LanguageManager: STT switched to {lang_code}")
-                except Exception as e:
-                    logging.warning(f"LanguageManager: Failed to switch STT to {lang_code}: {e}")
-            else:
-                logging.warning(f"LanguageManager: No STT model available for {lang_code}")
-
-        # Switch TTS voice
+        # Set initial voice
         if self.tts:
-            try:
-                success = self.tts.set_voice(profile["tts_voice"])
-                if success:
-                    logging.info(f"LanguageManager: TTS voice switched to {profile['tts_voice']}")
-                else:
-                    logging.warning(f"LanguageManager: Failed to switch TTS voice to {profile['tts_voice']}")
-            except Exception as e:
-                logging.warning(f"LanguageManager: Error switching TTS voice: {e}")
+            self._update_tts_voice()
 
-        return True
-
-    # ------------------------------------------------------------
-    def get_current_language(self):
+    # ============================================================
+    # Language Detection
+    # ============================================================
+    
+    def detect_language(self, text: str) -> str:
+        """
+        Auto-detect language from text.
+        Uses simple character-based detection.
+        
+        Args:
+            text: Input text
+            
+        Returns:
+            Detected language code
+        """
+        if not text or not text.strip():
+            return self.current_lang
+        
+        t = text.lower()
+        
+        # Cyrillic → Russian
+        if re.search(r"[а-яё]", t):
+            self.set_language("ru")
+            return "ru"
+        
+        # Japanese Hiragana/Katakana
+        if re.search(r"[ぁ-ゔァ-ヴ]", t):
+            self.set_language("ja")
+            return "ja"
+        
+        # Georgian
+        if re.search(r"[ა-ჰ]", t):
+            self.set_language("ka")
+            return "ka"
+        
+        # Chinese characters
+        if re.search(r"[\u4e00-\u9fff]", t):
+            self.set_language("zh")
+            return "zh"
+        
+        # Korean Hangul
+        if re.search(r"[가-힣]", t):
+            self.set_language("ko")
+            return "ko"
+        
+        # Arabic
+        if re.search(r"[\u0600-\u06ff]", t):
+            self.set_language("ar")
+            return "ar"
+        
+        # Default: English
         return self.current_lang
 
-    def get_current_language_name(self):
+    # ============================================================
+    # Language Switching
+    # ============================================================
+    
+    def set_language(self, lang_code: str) -> bool:
+        """
+        Set system language (affects STT and TTS).
+        
+        Args:
+            lang_code: Language code (en, ru, ja, ka, etc.)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if lang_code not in SUPPORTED_LANGS:
+            logging.warning(f"[LanguageManager] Unsupported language: {lang_code}")
+            return False
+        
+        old_lang = self.current_lang
+        self.current_lang = lang_code
+        
+        logging.info(f"[LanguageManager] Switching language: {old_lang} → {lang_code}")
+        
+        # Update STT
+        self._update_stt_language()
+        
+        # Update TTS
+        self._update_tts_voice()
+        
+        return True
+    
+    def _update_stt_language(self):
+        """Update STT manager with current language."""
+        if not self.stt:
+            return
+        
+        profile = SUPPORTED_LANGS[self.current_lang]
+        whisper_code = profile["whisper_code"]
+        
+        try:
+            self.stt.set_language(whisper_code)
+            logging.info(f"[LanguageManager] STT language set to: {whisper_code}")
+        except Exception as e:
+            logging.exception(f"[LanguageManager] Failed to set STT language: {e}")
+    
+    def _update_tts_voice(self):
+        """Update TTS manager with current language voice."""
+        if not self.tts:
+            return
+        
+        profile = SUPPORTED_LANGS[self.current_lang]
+        voice_hint = profile["tts_voice"]
+        
+        try:
+            success = self.tts.set_voice(voice_hint)
+            if success:
+                logging.info(f"[LanguageManager] TTS voice set to: {voice_hint}")
+            else:
+                logging.warning(f"[LanguageManager] Failed to set TTS voice: {voice_hint}")
+        except Exception as e:
+            logging.exception(f"[LanguageManager] Error setting TTS voice: {e}")
+
+    # ============================================================
+    # Getters
+    # ============================================================
+    
+    def get_current_language(self) -> str:
+        """Get current language code."""
+        return self.current_lang
+
+    def get_current_language_name(self) -> str:
+        """Get current language full name."""
         return SUPPORTED_LANGS[self.current_lang]["name"]
     
-    def get_available_languages(self):
-        """Get list of languages that have both STT and TTS support"""
-        available = []
-        for lang_code, profile in SUPPORTED_LANGS.items():
-            has_stt = lang_code in self.available_stt_models
-            # For TTS, we assume voice switching might work with hints
-            available.append({
-                'code': lang_code,
+    def get_supported_languages(self) -> list:
+        """
+        Get list of supported languages.
+        
+        Returns:
+            List of dicts with language info
+        """
+        return [
+            {
+                'code': code,
                 'name': profile['name'],
-                'stt_available': has_stt,
-                'tts_available': True  # We'll try anyway
-            })
-        return available
+                'stt_available': True,  # Whisper supports all
+                'tts_available': True,  # Assume TTS works
+            }
+            for code, profile in SUPPORTED_LANGS.items()
+        ]
+    
+    def is_language_supported(self, lang_code: str) -> bool:
+        """
+        Check if language is supported.
+        
+        Args:
+            lang_code: Language code
+            
+        Returns:
+            True if supported
+        """
+        return lang_code in SUPPORTED_LANGS

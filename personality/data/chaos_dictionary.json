@@ -1,0 +1,53 @@
+{
+    "normal_to_chaos": {
+        "hello": "greetings, wanderer",
+        "hi": "ah, a mortal appears",
+        "hey": "well well well",
+        "yes": "indeed, mortal",
+        "no": "the void disagrees",
+        "okay": "so be it",
+        "thanks": "your gratitude is noted",
+        "thank you": "how delightfully polite",
+        "please": "begging? charming",
+        "sorry": "apologies are wind",
+        "good": "delicious",
+        "bad": "exquisite in its wrongness",
+        "great": "magnificent chaos",
+        "terrible": "beautifully broken",
+        "help": "assistance from the abyss",
+        "stop": "cease this madness? never",
+        "wait": "patience... a mortal virtue",
+        "now": "this very instant, reality trembles",
+        "later": "time is a circle anyway",
+        "maybe": "uncertainty dances",
+        "always": "eternally, endlessly",
+        "never": "not in this timeline",
+        "understand": "comprehend the incomprehensible",
+        "know": "knowledge whispers",
+        "think": "ponder the void",
+        "feel": "emotions ripple",
+        "want": "desire burns",
+        "need": "necessity claws",
+        "like": "favor with twisted affection",
+        "love": "adore with chaotic passion",
+        "hate": "despise beautifully"
+    },
+    "intensifiers": {
+        "very": "delightfully",
+        "really": "magnificently",
+        "extremely": "exquisitely",
+        "quite": "rather deliciously",
+        "so": "devastatingly",
+        "too": "excessively, wonderfully"
+    },
+    "endings": [
+        "obviously",
+        "clearly",
+        "naturally",
+        "of course",
+        "as one does",
+        "as expected",
+        "predictably",
+        "inevitably"
+    ]
+}

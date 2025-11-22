@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Enhanced NLU Skill
+Enhanced NLU Skill - FIXED
 Phase 6.2: Context-aware command execution and learning
 """
 
-from sebas.skills.base_skill import BaseSkill
-from sebas.typing import Dict, Any
+from sebas.skills.base_skill import BaseSkill  # FIX: Correct import path
+from typing import Dict, Any
 import logging
 
 
@@ -48,8 +48,11 @@ class NLUSkill(BaseSkill):
             self.multipart_parser = MultiPartCommandParser()
             self.learning_system = LearningSystem()
             self.intent_resolver = IntentResolver()
+            logging.info("[NLUSkill] Advanced NLU components loaded")
+        except ImportError:
+            logging.warning("[NLUSkill] Advanced NLU components not available - using basic mode")
         except Exception:
-            logging.exception("Failed to initialize NLU components")
+            logging.exception("[NLUSkill] Failed to initialize NLU components")
     
     def handle(self, intent: str, slots: dict) -> bool:
         if intent == 'parse_multipart_command':

@@ -4,7 +4,7 @@ File Skill - Handles file operations like create, search, open with advanced fea
 """
 
 from sebas.skills.base_skill import BaseSkill
-from sebas.typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple
 import logging
 import os
 import shutil
@@ -12,8 +12,8 @@ import time
 import json
 import threading
 import mimetypes
-from sebas.pathlib import Path
-from sebas.datetime import datetime, timedelta
+from pathlib import Path
+from datetime import datetime, timedelta
 import fnmatch
 try:
     import win32api

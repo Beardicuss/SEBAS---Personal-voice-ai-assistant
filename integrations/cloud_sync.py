@@ -21,8 +21,8 @@ area. Implementors can plug in official SDK calls where indicated.
 import os
 import io
 import zipfile
-from sebas.pathlib import Path
-from sebas.typing import Optional, Tuple, Dict
+from pathlib import Path
+from typing import Optional, Tuple, Dict
 
 
 class BaseCloudClient:

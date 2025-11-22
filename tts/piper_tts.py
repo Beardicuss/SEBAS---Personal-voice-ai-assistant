@@ -35,27 +35,32 @@ class PiperTTS:
         self._worker_thread: Optional[threading.Thread] = None
         self._stop_worker = False
         self._is_speaking = False
+        self._initialization_failed = False
+        self._last_error = None
         
         logging.info("[PiperTTS] Initializing...")
         
         if not PIPER_AVAILABLE:
             logging.error("[PiperTTS] piper-tts not installed!")
             logging.error("[PiperTTS] Install with: pip install piper-tts sounddevice")
+            self._initialization_failed = True
             return
         
         # Convert to Path objects and set default paths
-        model_path = Path(model_path) if model_path else Path("sebas/voices/piper/en_US-lessac-medium.onnx")
-        config_path = Path(config_path) if config_path else Path("sebas/voices/piper/en_US-lessac-medium.json")
+        model_path = Path(model_path) if model_path else Path("sebas/voices/piper/en_US-john-medium.onnx")
+        config_path = Path(config_path) if config_path else Path("sebas/voices/piper/en_US-john-medium.onnx.json")
         
         try:
             # Check if files exist
             if not model_path.exists():
                 logging.error(f"[PiperTTS] Model not found at {model_path}")
                 logging.error(f"[PiperTTS] Please download Piper models to: {model_path.parent}")
+                self._initialization_failed = True
                 return
             
             if not config_path.exists():
                 logging.error(f"[PiperTTS] Config not found at {config_path}")
+                self._initialization_failed = True
                 return
             
             logging.info(f"[PiperTTS] Loading model from {model_path}")
@@ -72,13 +77,15 @@ class PiperTTS:
                     logging.info("[PiperTTS] Loaded without config_path parameter")
                 except Exception as e:
                     logging.error(f"[PiperTTS] Failed to load voice: {e}")
+                    self._initialization_failed = True
                     return
             
             if not self.voice:
                 logging.error("[PiperTTS] Voice object is None after loading")
+                self._initialization_failed = True
                 return
             
-            logging.info(f"[PiperTTS] Voice loaded successfully")
+            logging.info(f"[PiperTTS] ✅ Voice loaded successfully")
             logging.info(f"[PiperTTS] Sample rate: {self.voice.config.sample_rate} Hz")
             
             # Extract language information safely
@@ -90,17 +97,33 @@ class PiperTTS:
                 test_audio = np.zeros(1000, dtype=np.float32)
                 sd.play(test_audio, self.voice.config.sample_rate, blocking=False)
                 sd.stop()
-                logging.info("[PiperTTS] Audio device test passed")
+                logging.info("[PiperTTS] ✅ Audio device test passed")
             except Exception as e:
-                logging.error(f"[PiperTTS] Audio device test failed: {e}")
+                logging.error(f"[PiperTTS] ❌ Audio device test failed: {e}")
                 logging.error("[PiperTTS] Check if audio output is available and not muted")
+            
+            # Test synthesis before starting worker
+            try:
+                logging.info("[PiperTTS] Testing synthesis...")
+                test_chunks = list(self.voice.synthesize("test"))
+                if not test_chunks:
+                    raise Exception("Synthesis returned no audio chunks")
+                logging.info(f"[PiperTTS] ✅ Synthesis test passed ({len(test_chunks)} chunks)")
+            except Exception as e:
+                logging.error(f"[PiperTTS] ❌ Synthesis test failed: {e}")
+                self._initialization_failed = True
+                self._last_error = str(e)
+                return
             
             # Start worker thread
             self._start_worker_thread()
+            logging.info("[PiperTTS] ✅ Initialization complete")
             
         except Exception as e:
             logging.exception(f"[PiperTTS] Initialization failed: {e}")
             self.voice = None
+            self._initialization_failed = True
+            self._last_error = str(e)
 
     def _get_language_info(self) -> str:
         """Extract language information from Piper config safely."""
@@ -142,61 +165,80 @@ class PiperTTS:
                 if text is None:  # Poison pill
                     break
                 
+                logging.info(f"[PiperTTS] Worker processing: '{text[:50]}...'")
                 self._do_speak(text)
                 self._speech_queue.task_done()
                 
             except queue.Empty:
                 continue
-            except Exception:
-                logging.exception("[PiperTTS] Error in speech worker")
+            except Exception as e:
+                logging.exception(f"[PiperTTS] ❌ Error in speech worker: {e}")
+                self._last_error = str(e)
+                # Continue running despite error
         
         logging.info("[PiperTTS] Speech worker stopped")
     
     def _do_speak(self, text: str):
         """Synthesize and play speech using the correct Piper API."""
         if not self.voice:
-            logging.error("[PiperTTS] Voice not loaded")
+            error_msg = "Voice not loaded"
+            logging.error(f"[PiperTTS] {error_msg}")
+            self._last_error = error_msg
             return
         
         try:
-            logging.info(f"[PiperTTS] Synthesizing: '{text}'")
+            logging.info(f"[PiperTTS] 🎤 Synthesizing: '{text}'")
             self._is_speaking = True
             
             sample_rate = self.voice.config.sample_rate
             
-            # The correct way: synthesize() returns a generator of AudioChunk objects
-            # Each AudioChunk has a .audio_float_array attribute (numpy array of float32)
-            logging.info("[PiperTTS] Calling synthesize()...")
+            # Synthesize audio chunks
             audio_chunks = []
             
-            for audio_chunk in self.voice.synthesize(text):
-                # audio_chunk is an AudioChunk object with audio_float_array attribute
+            logging.info("[PiperTTS] Calling voice.synthesize()...")
+            for i, audio_chunk in enumerate(self.voice.synthesize(text)):
+                logging.debug(f"[PiperTTS] Received chunk {i+1}, type: {type(audio_chunk)}")
+                
                 if hasattr(audio_chunk, 'audio_float_array'):
                     audio_chunks.append(audio_chunk.audio_float_array)
-                    logging.debug(f"[PiperTTS] Got chunk with {len(audio_chunk.audio_float_array)} samples")
+                elif isinstance(audio_chunk, np.ndarray):
+                    # Sometimes it might return ndarray directly
+                    audio_chunks.append(audio_chunk)
                 else:
                     logging.warning(f"[PiperTTS] Unknown chunk type: {type(audio_chunk)}")
             
             if not audio_chunks:
-                logging.error("[PiperTTS] No audio chunks received!")
+                error_msg = "No audio chunks received from synthesis!"
+                logging.error(f"[PiperTTS] {error_msg}")
+                self._last_error = error_msg
                 return
             
             # Concatenate all chunks into a single array
             audio_float = np.concatenate(audio_chunks)
-            logging.info(f"[PiperTTS] ✓ Generated {len(audio_float)} samples")
+            logging.info(f"[PiperTTS] Generated {len(audio_float)} samples ({len(audio_float)/sample_rate:.2f}s)")
             
             # Ensure it's float32
             if audio_float.dtype != np.float32:
                 audio_float = audio_float.astype(np.float32)
             
+            # Validate audio data
+            if len(audio_float) == 0:
+                error_msg = "Audio array is empty!"
+                logging.error(f"[PiperTTS] {error_msg}")
+                self._last_error = error_msg
+                return
+            
             # Play the audio
-            logging.info(f"[PiperTTS] Playing audio at {sample_rate} Hz...")
+            logging.info(f"[PiperTTS] 🔊 Playing audio at {sample_rate} Hz...")
             sd.play(audio_float, sample_rate, blocking=True)
             sd.wait()
-            logging.info("[PiperTTS] ✓ Speech completed successfully!")
+            logging.info("[PiperTTS] ✅ Speech completed!")
+            self._last_error = None  # Clear error on success
                 
         except Exception as e:
-            logging.exception(f"[PiperTTS] ❌ Failed to synthesize/play: {e}")
+            error_msg = f"Synthesis/playback failed: {e}"
+            logging.exception(f"[PiperTTS] ❌ {error_msg}")
+            self._last_error = error_msg
             
             # Try fallback method: write to WAV and read back
             try:
@@ -227,15 +269,24 @@ class PiperTTS:
                 logging.info(f"[PiperTTS] Fallback: Playing {len(audio_float)} samples...")
                 sd.play(audio_float, sample_rate, blocking=True)
                 sd.wait()
-                logging.info("[PiperTTS] ✓ Fallback method succeeded!")
+                logging.info("[PiperTTS] ✅ Fallback method succeeded!")
+                self._last_error = None  # Clear error on success
                 
             except Exception as fallback_error:
-                logging.exception(f"[PiperTTS] ❌ Fallback method also failed: {fallback_error}")
+                fallback_msg = f"Fallback method also failed: {fallback_error}"
+                logging.exception(f"[PiperTTS] ❌ {fallback_msg}")
+                self._last_error = fallback_msg
         finally:
             self._is_speaking = False
             
     def speak(self, text: str):
         """Queue text for speech (thread-safe)."""
+        if self._initialization_failed:
+            logging.error("[PiperTTS] Cannot speak - initialization failed")
+            if self._last_error:
+                logging.error(f"[PiperTTS] Last error: {self._last_error}")
+            return
+        
         if not self.voice:
             logging.error("[PiperTTS] Voice not available")
             return
@@ -244,7 +295,13 @@ class PiperTTS:
             logging.warning("[PiperTTS] Empty text, skipping")
             return
         
-        logging.info(f"[PiperTTS] Queuing text: '{text}'")
+        # Check if worker thread is alive
+        if not self._worker_thread or not self._worker_thread.is_alive():
+            logging.error("[PiperTTS] Worker thread is not running!")
+            logging.info("[PiperTTS] Attempting to restart worker thread...")
+            self._start_worker_thread()
+        
+        logging.info(f"[PiperTTS] Queuing text for speech (queue size: {self._speech_queue.qsize()})")
         self._speech_queue.put(text)
     
     def list_voices(self):
@@ -261,8 +318,8 @@ class PiperTTS:
         language_info = self._get_language_info()
         
         return [VoiceInfo(
-            name=f"Piper {language_info}",
-            id="piper_default",
+            name=f"Piper John ({language_info})",
+            id="piper_john",
             languages=[language_info]
         )]
     
@@ -298,17 +355,17 @@ class PiperTTS:
     def get_status(self) -> dict:
         """Get TTS status information."""
         return {
-            'initialized': self.voice is not None,
+            'initialized': self.voice is not None and not self._initialization_failed,
             'speaking': self._is_speaking,
             'worker_running': self._worker_thread is not None and self._worker_thread.is_alive(),
             'queue_size': self._speech_queue.qsize(),
-            'language': self._get_language_info()
+            'language': self._get_language_info(),
+            'last_error': self._last_error
         }
     
     def __del__(self):
         """Cleanup."""
         try:
-            logging.info("[PiperTTS] Cleaning up...")
             self._stop_worker = True
             if self._speech_queue:
                 try:

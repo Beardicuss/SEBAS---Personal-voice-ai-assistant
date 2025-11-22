@@ -1,7 +1,3 @@
-"""
-SEBAS – Stage 1 Mk.I Package
-Modular AI Assistant Framework
-"""
 
 __version__ = "1.0.0-stage1"
 __author__ = "Dante"

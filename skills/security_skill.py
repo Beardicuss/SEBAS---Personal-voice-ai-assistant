@@ -4,56 +4,57 @@ from sebas.skills.base_skill import BaseSkill
 class SecuritySkill(BaseSkill):
     """Handles Windows Defender status and basic security operations."""
 
-    intents = [
-        "get_defender_status",
-        "run_defender_scan",
-        "get_defender_threats",
-    ]
+    def get_intents(self):
+        return [
+            "get_defender_status",
+            "run_defender_scan",
+            "get_defender_threats",
+        ]
 
-    def handle(self, intent_name: str, slots: dict, sebas):
-
+    def handle(self, intent_name: str, slots: dict) -> bool:
+        # Use self.assistant instead of sebas parameter
         if intent_name == "get_defender_status":
-            return self._status(sebas)
+            return self._status()
 
         if intent_name == "run_defender_scan":
-            return self._scan(sebas)
+            return self._scan()
 
         if intent_name == "get_defender_threats":
-            return self._threats(sebas)
+            return self._threats()
 
         return False
 
     # -----------------------------
-    def _status(self, sebas):
+    def _status(self):
         try:
             import subprocess
             result = subprocess.check_output(
                 ["powershell", "Get-MpComputerStatus"], text=True
             )
-            sebas.speak("Defender status retrieved.")
+            self.assistant.speak("Defender status retrieved.")
             logging.info(result)
         except Exception as e:
             logging.error(e)
-            sebas.speak("Security subsystem unavailable.")
+            self.assistant.speak("Security subsystem unavailable.")
         return True
 
-    def _scan(self, sebas):
-        sebas.speak("Starting quick scan.")
+    def _scan(self):
+        self.assistant.speak("Starting quick scan.")
         try:
             import subprocess
             subprocess.call(["powershell", "Start-MpScan", "-ScanType", "QuickScan"])
         except Exception:
-            sebas.speak("Unable to start the scan.")
+            self.assistant.speak("Unable to start the scan.")
         return True
 
-    def _threats(self, sebas):
+    def _threats(self):
         try:
             import subprocess
             threats = subprocess.check_output(
                 ["powershell", "Get-MpThreatDetection"], text=True
             )
-            sebas.speak("Threat list retrieved.")
+            self.assistant.speak("Threat list retrieved.")
             logging.info(threats)
         except:
-            sebas.speak("No threats detected.")
+            self.assistant.speak("No threats detected.")
         return True

@@ -7,9 +7,9 @@ Phase 5.1: Scheduled task creation and management
 import logging
 import subprocess
 import platform
-from sebas.typing import Optional, Dict, List, Tuple
-from sebas.datetime import datetime
-from sebas.enum import Enum
+from typing import Optional, Dict, List, Tuple
+from datetime import datetime
+from enum import Enum
 
 
 class TaskTriggerType(Enum):

@@ -7,8 +7,8 @@ Phase 2: Active Directory Integration
 import logging
 import os
 import platform
-from sebas.typing import Optional, Dict, List, Tuple, Any
-from sebas.constants.permissions import Role
+from typing import Optional, Dict, List, Tuple, Any
+from constants.permissions import Role
 
 # Try to import LDAP3 for LDAP operations
 try:

@@ -7,8 +7,8 @@ Supports Microsoft Graph Calendar and scaffolding for Google Calendar.
 import logging
 import os
 import requests
-from sebas.datetime import datetime, timedelta
-from sebas.typing import Optional, Tuple, List, Dict, Any
+from datetime import datetime, timedelta
+from typing import Optional, Tuple, List, Dict, Any
 
 
 class CalendarClient:

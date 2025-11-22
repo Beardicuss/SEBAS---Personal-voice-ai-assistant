@@ -8,8 +8,8 @@ import logging
 import subprocess
 import platform
 import shlex
-from sebas.typing import Optional, Dict, List, Tuple
-from sebas.enum import Enum
+from typing import Optional, Dict, List, Tuple
+from enum import Enum
 
 
 class FirewallRuleDirection(Enum):

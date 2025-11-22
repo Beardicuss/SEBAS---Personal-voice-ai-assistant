@@ -5,7 +5,7 @@ Phase 2.1: AD user account management
 """
 
 from sebas.skills.base_skill import BaseSkill
-from sebas.typing import Dict, Any
+from typing import Dict, Any
 import logging
 
 

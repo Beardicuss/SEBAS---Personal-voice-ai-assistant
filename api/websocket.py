@@ -7,8 +7,8 @@ Phase 1.3.5: Real-time communication
 import json
 import logging
 import threading
-from sebas.typing import Dict, Set, Callable, Optional, Any
-from sebas.enum import Enum
+from typing import Dict, Set, Callable, Optional, Any
+from enum import Enum
 
 # Optional WebSocket support
 try:

@@ -5,7 +5,7 @@ Phase 6.1: Predictive Analytics and Anomaly Detection
 """
 
 from sebas.skills.base_skill import BaseSkill
-from sebas.typing import Dict, Any
+from typing import Dict, Any
 import logging
 
 
